@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # )
 
     DATABASE_URL: str = (
-    "postgresql+asyncpg://neondb_owner:npg_gZ4eYlSdwr3o@ep-tiny-sound-agslibpd-pooler.c-2.eu-central-1.aws.neon.tech/rh_db?sslmode=require"
+    "postgresql+asyncpg://neondb_owner:npg_gZ4eYlSdwr3o@ep-tiny-sound-agslibpd-pooler.c-2.eu-central-1.aws.neon.tech/rh_db?ssl=require"
 )
 
     # Security
