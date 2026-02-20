@@ -1,0 +1,4 @@
+# file: d:\PROJETS\PYTHON_3\rhBackFast\app\user_app\models.py
+# hypothesis_version: 6.151.6
+
+[100, 200, 255, 500, 'ACTIVE', 'Alert', 'CASCADE', 'Contrat', 'Document', 'Employe', 'Employe.id', 'Group', 'GroupPermission', 'Permission', 'RetenueEmploye', 'SET NULL', 'Service', 'ServiceGroup', 'USD', 'User', 'UserGroup', 'UserGroup.user_id', 'action', 'all, delete-orphan', 'assigned_by_user', 'assigned_user_groups', 'ck_employe_sexe', 'ck_permission_action', 'contrats', 'denied', 'documents', 'employe', 'employes', 'granted', 'group', 'group_id', 'group_permissions', 'nombre_enfants >= 0', 'permission', 'permission_id', 'poste', 'resource', 'responsable', 'rh_contrat', 'rh_document', 'rh_employe', 'rh_employe.id', 'rh_service', 'rh_service.id', 'rh_service_group', 'rh_service_group.id', 'salaire_base > 0', 'service', 'service_groups', 'service_id', 'subordonnes', 'uq_group_permission', 'uq_service_group', 'user', 'user_account', 'user_groups', 'user_management_user']

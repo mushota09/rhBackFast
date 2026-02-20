@@ -1,0 +1,4 @@
+# file: d:\PROJETS\PYTHON_3\rhBackFast\app\user_app\services.py
+# hypothesis_version: 6.151.6
+
+[100, 'System', 'active_groups', 'code', 'contract', 'documents', 'email_personnel', 'email_professionnel', 'employe_id', 'employee', 'group_assigned', 'group_code', 'group_id', 'group_name', 'groups_assigned', 'matricule', 'message', 'nom', 'password', 'postnom', 'prenom', 'telephone_personnel', 'total_groups', 'user']

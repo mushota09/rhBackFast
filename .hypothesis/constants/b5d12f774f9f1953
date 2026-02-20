@@ -1,0 +1,4 @@
+# file: d:\PROJETS\PYTHON_3\rhBackFast\app\user_app\services.py
+# hypothesis_version: 6.151.6
+
+['email_professionnel', 'employee', 'group_assigned', 'group_id', 'password', 'user']

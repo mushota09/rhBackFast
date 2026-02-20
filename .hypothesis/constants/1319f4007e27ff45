@@ -1,0 +1,4 @@
+# file: D:\PROJETS\PYTHON_3\rhBackFast\app\core\config.py
+# hypothesis_version: 6.150.2
+
+[0.0, 0.2, 0.3, 3000, 5000, 10000, 15000, 150000, 300000, '.env', '0.04', '0.06', '1.0.0', '18000', '2400', '27000', 'HS256', 'INSS_EMPLOYEE_CAP', 'INSS_EMPLOYEE_RATE', 'INSS_PENSION_CAP', 'INSS_PENSION_RATE', 'INSS_RISK_CAP', 'INSS_RISK_RATE', 'IRE_BRACKETS', 'PAYROLL__', 'RH Management System', 'amount', 'children', 'children_additional', 'inf', 'max', 'min', 'rate']

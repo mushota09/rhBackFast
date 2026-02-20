@@ -1,0 +1,1963 @@
+"""FastAPI routes for user_app"""
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+
+from app.core.database import get_db
+from app.core.security import (
+    get_password_hash,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+    get_current_user
+)
+from app.user_app import schemas
+from app.user_app.models import Service, Group, User, Employe, Permission, GroupPermission, UserGroup, Contrat, Document
+from app.user_app.services import EmployeeService, GroupService, PermissionService
+from app.audit_app.services import AuditService
+
+router = APIRouter()
+
+# ************************************************************************
+# AUTHENTIFICATION ROUTES
+# ************************************************************************
+auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@auth_router.post("/login", response_model=schemas.TokenResponse)
+async def login(
+    credentials: schemas.LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Authenticate user and return JWT tokens"""
+    # Get user by email
+    result = await db.execute(select(User).where(User.email == credentials.email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Log failed login attempt
+        await AuditService.log_login(
+            db=db,
+            user=None,
+            request=request,
+            success=False
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Aucun utilisateur correspondant à cette adresse email"
+        )
+
+    # Verify password
+    if not verify_password(credentials.password, user.password):
+        # Log failed login attempt
+        await AuditService.log_login(
+            db=db,
+            user=user,
+            request=request,
+            success=False
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Mot de passe incorrect"
+        )
+
+    # Check if user is active
+    if not user.is_active:
+        # Log failed login attempt
+        await AuditService.log_login(
+            db=db,
+            user=user,
+            request=request,
+            success=False
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Ce compte est désactivé"
+        )
+
+    # Create tokens
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+
+    # Log successful login
+    await AuditService.log_login(
+        db=db,
+        user=user,
+        request=request,
+        success=True
+    )
+
+    return {
+        "access": access_token,
+        "refresh": refresh_token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "nom": user.nom,
+            "prenom": user.prenom
+        }
+    }
+
+
+@auth_router.post("/refresh", response_model=schemas.AccessTokenResponse)
+async def refresh_access_token(request: schemas.RefreshTokenRequest):
+    """Refresh access token using refresh token"""
+    try:
+        payload = verify_token(request.refresh_token, "refresh")
+        new_access_token = create_access_token(payload["user_id"])
+        return {"access_token": new_access_token}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e)
+        ) from e
+
+
+@auth_router.post("/logout")
+async def logout(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Logout user (client should delete tokens)"""
+    # Log the logout
+    await AuditService.log_logout(
+        db=db,
+        user=current_user,
+        request=request
+    )
+
+    return {
+        "message": "Déconnecté avec succès. Supprimez les tokens côté client."
+    }
+
+
+@auth_router.get("/protected")
+async def protected_route(current_user: User = Depends(get_current_user)):
+    """Protected route for testing authentication"""
+    return {
+        "message": f"Bonjour {current_user.prenom or current_user.nom}",
+        "user_id": current_user.id
+    }
+
+# ************************************************************************
+# SERVICE ROUTES
+# ************************************************************************
+
+service_router = APIRouter(prefix="/services", tags=["Services"])
+
+
+@service_router.get("/")
+async def list_services(
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all services with optional pagination and expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+    query = select(Service)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Service, expand_fields)
+
+    # Get total count
+    count_query = select(func.count()).select_from(Service)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        services = result.scalars().all()
+        return {
+            "results": list(services),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        services = result.scalars().all()
+        return {
+            "results": list(services),
+            "total": total
+        }
+
+
+@service_router.post("/", response_model=schemas.ServiceResponse)
+async def create_service(
+    service: schemas.ServiceCreate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Create a new service"""
+    db_service = Service(**service.model_dump())
+    db.add(db_service)
+    await db.commit()
+    await db.refresh(db_service)
+    return db_service
+
+
+@service_router.get("/{service_id}", response_model=schemas.ServiceResponse)
+async def get_service(
+    service_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get service by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+    query = select(Service).where(Service.id == service_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Service, expand_fields)
+
+    result = await db.execute(query)
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return service
+
+
+@service_router.put("/{service_id}", response_model=schemas.ServiceResponse)
+async def update_service(
+    service_id: int,
+    service_update: schemas.ServiceUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Update service"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Service).where(Service.id == service_id)
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    for key, value in service_update.model_dump(exclude_unset=True).items():
+        setattr(service, key, value)
+
+    await db.commit()
+    await db.refresh(service)
+    return service
+
+
+@service_router.delete("/{service_id}")
+async def delete_service(
+    service_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Delete service"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Service).where(Service.id == service_id)
+    )
+    service = result.scalar_one_or_none()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    await db.delete(service)
+    await db.commit()
+    return {"message": "Service deleted successfully"}
+
+
+# ************************************************************************
+# SERVICE GROUP ROUTES
+# ************************************************************************
+
+service_group_router = APIRouter(
+    prefix="/service-groups",
+    tags=["Service Groups"]
+)
+
+
+@service_group_router.get("/")
+async def list_service_groups(
+    service_id: Optional[int] = Query(None),
+    group_id: Optional[int] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """List service groups with optional filters and pagination"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+    from app.user_app.models import ServiceGroup
+
+    query = select(ServiceGroup)
+
+    # Apply filters
+    if service_id is not None:
+        query = query.where(ServiceGroup.service_id == service_id)
+    if group_id is not None:
+        query = query.where(ServiceGroup.group_id == group_id)
+
+    # Get total count (before expansion to avoid unnecessary joins)
+    count_query = select(func.count()).select_from(ServiceGroup)
+    if service_id is not None:
+        count_query = count_query.where(ServiceGroup.service_id == service_id)
+    if group_id is not None:
+        count_query = count_query.where(ServiceGroup.group_id == group_id)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, ServiceGroup, expand_fields)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        service_groups = result.scalars().all()
+        return {
+            "results": list(service_groups),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        service_groups = result.scalars().all()
+        return {
+            "results": list(service_groups),
+            "total": total
+        }
+
+
+@service_group_router.post(
+    "/",
+    response_model=schemas.ServiceGroupResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_service_group(
+    service_group: schemas.ServiceGroupCreate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Create a service group association"""
+    from app.user_app.models import ServiceGroup
+
+    # Validate service exists
+    result = await db.execute(
+        select(Service).where(Service.id == service_group.service_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Service with ID {service_group.service_id} not found"
+        )
+
+    # Validate group exists
+    result = await db.execute(
+        select(Group).where(Group.id == service_group.group_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Group with ID {service_group.group_id} not found"
+        )
+
+    # Check for duplicate
+    result = await db.execute(
+        select(ServiceGroup).where(
+            ServiceGroup.service_id == service_group.service_id,
+            ServiceGroup.group_id == service_group.group_id
+        )
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail="Service group association already exists"
+        )
+
+    # Create service group
+    db_service_group = ServiceGroup(**service_group.model_dump())
+    db.add(db_service_group)
+    await db.commit()
+    await db.refresh(db_service_group)
+    return db_service_group
+
+
+@service_group_router.get(
+    "/{service_group_id}",
+    response_model=schemas.ServiceGroupResponse
+)
+async def get_service_group(
+    service_group_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get service group by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+    from app.user_app.models import ServiceGroup
+
+    query = select(ServiceGroup).where(ServiceGroup.id == service_group_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, ServiceGroup, expand_fields)
+
+    result = await db.execute(query)
+    service_group = result.scalar_one_or_none()
+    if not service_group:
+        raise HTTPException(status_code=404, detail="Service group not found")
+    return service_group
+
+
+@service_group_router.put(
+    "/{service_group_id}",
+    response_model=schemas.ServiceGroupResponse
+)
+async def update_service_group(
+    service_group_id: int,
+    service_group_update: schemas.ServiceGroupUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Update service group"""
+    from app.user_app.models import ServiceGroup
+
+    result = await db.execute(
+        select(ServiceGroup).where(ServiceGroup.id == service_group_id)
+    )
+    service_group = result.scalar_one_or_none()
+    if not service_group:
+        raise HTTPException(status_code=404, detail="Service group not found")
+
+    # Update fields
+    update_data = service_group_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(service_group, key, value)
+
+    await db.commit()
+    await db.refresh(service_group)
+    return service_group
+
+
+@service_group_router.delete("/{service_group_id}")
+async def delete_service_group(
+    service_group_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Delete service group"""
+    from app.user_app.models import ServiceGroup
+
+    result = await db.execute(
+        select(ServiceGroup).where(ServiceGroup.id == service_group_id)
+    )
+    service_group = result.scalar_one_or_none()
+    if not service_group:
+        raise HTTPException(status_code=404, detail="Service group not found")
+
+    await db.delete(service_group)
+    await db.commit()
+    return {"message": "Service group deleted successfully"}
+
+
+# ************************************************************************
+# GROUPE ROUTES
+# ************************************************************************
+
+group_router = APIRouter(prefix="/groups", tags=["Groups"])
+
+
+@group_router.get("/")
+async def list_groups(
+    is_active: Optional[bool] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all groups with optional pagination and expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Group)
+
+    # Apply filters
+    if is_active is not None:
+        query = query.where(Group.is_active == is_active)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Group, expand_fields)
+
+    # Get total count
+    count_query = select(func.count()).select_from(Group)
+    if is_active is not None:
+        count_query = count_query.where(Group.is_active == is_active)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply ordering
+    query = query.order_by(Group.code)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        groups = result.scalars().all()
+        return {
+            "results": list(groups),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        groups = result.scalars().all()
+        return {
+            "results": list(groups),
+            "total": total
+        }
+
+
+@group_router.post("/", response_model=schemas.GroupResponse)
+async def create_group(
+    group: schemas.GroupCreateWithServices,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Create a new group with service associations"""
+    try:
+        group_data = group.model_dump(exclude={"service_ids"})
+        db_group, _ = await GroupService.create_with_services(
+            db, group_data, group.service_ids
+        )
+        await db.commit()
+        await db.refresh(db_group)
+        return db_group
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+
+
+@group_router.get("/{group_id}", response_model=schemas.GroupResponse)
+async def get_group(
+    group_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get group by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Group).where(Group.id == group_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Group, expand_fields)
+
+    result = await db.execute(query)
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    return group
+
+
+@group_router.put("/{group_id}", response_model=schemas.GroupResponse)
+async def update_group(
+    group_id: int,
+    group_update: schemas.GroupUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Update group"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Group).where(Group.id == group_id)
+    )
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    for key, value in group_update.model_dump(exclude_unset=True).items():
+        setattr(group, key, value)
+
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+@group_router.delete("/{group_id}")
+async def delete_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Delete group with validation"""
+    try:
+        result = await GroupService.delete_with_validation(db, group_id)
+        await db.commit()
+        return result
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+
+
+# ************************************************************************
+# EMPLOYE ROUTES
+# ************************************************************************
+employe_router = APIRouter(prefix="/employees", tags=["Employees"])
+
+
+@employe_router.get("/")
+async def list_employees(
+    poste_id: Optional[int] = Query(None),
+    statut_emploi: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    expand: Optional[str] = Query(None),
+    ordering: Optional[str] = Query('-id'),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all employees with filters, search, and pagination"""
+    from app.core.query_utils import parse_expand_param, apply_expansion, apply_search, apply_ordering
+
+    # Base query
+    query = select(Employe)
+
+    # Apply filters
+    if poste_id is not None:
+        query = query.where(Employe.poste_id == poste_id)
+
+    if statut_emploi:
+        query = query.where(Employe.statut_emploi == statut_emploi)
+
+    # Apply search
+    if search:
+        search_fields = [
+            'prenom', 'nom', 'postnom', 'email_personnel',
+            'email_professionnel', 'matricule', 'telephone_personnel'
+        ]
+        query = apply_search(query, Employe, search_fields, search)
+
+    # Get total count (before expansion to avoid unnecessary joins)
+    # Use subquery to get accurate count with all filters applied
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Employe, expand_fields)
+
+    # Apply ordering
+    query = apply_ordering(query, Employe, ordering)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        employees = result.scalars().all()
+        return {
+            "results": list(employees),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        employees = result.scalars().all()
+        return {
+            "results": list(employees),
+            "total": total
+        }
+
+
+@employe_router.post("/", response_model=schemas.EmployeResponse)
+async def create_employee(
+    employee: schemas.EmployeCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    # current_user: User = Depends(get_current_user)
+):
+    """Create a new employee (basic creation without user account)"""
+    try:
+        db_employee = await EmployeeService.create_employee(db, employee)
+        await db.commit()
+        await db.refresh(db_employee)
+
+        # Log the creation
+        await AuditService.log_model_change(
+            db=db,
+            user=current_user,
+            instance=db_employee,
+            action="CREATE",
+            request=request
+        )
+
+        return db_employee
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+
+
+@employe_router.post("/with-user", response_model=schemas.EmployeCreateResponse)
+async def create_employee_with_user(
+    employee: schemas.EmployeCreateWithUser,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create employee with user account and optional group assignment
+
+    This follows the rhBack logic:
+    1. Create employee
+    2. Create user account linked to employee
+    3. Optionally assign user to a group (if group_id provided)
+    """
+    try:
+        result = await EmployeeService.create_employee_with_user(
+            db,
+            employee,
+            created_by=current_user
+        )
+        await db.commit()
+        return {
+            "employee": result["employee"],
+            "user": result["user"],
+            "group_assigned": result["group_assigned"]
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+
+
+@employe_router.post(
+    "/create-complete",
+    response_model=schemas.CompleteEmployeeResponse
+)
+async def create_complete_employee(
+    request: schemas.CompleteEmployeeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create complete employee with contract, documents, user account,
+    optional group assignment, and ServiceGroup creation
+
+    This endpoint creates:
+    1. Employee record
+    2. ServiceGroup association (if employee has poste_id and group_id)
+    3. Contract
+    4. Documents (if provided)
+    5. User account
+    6. Group assignment (if group_id provided)
+
+    All operations are performed in a single transaction.
+    If any step fails, all changes are rolled back.
+    """
+    try:
+        result = await EmployeeService.create_complete_employee(
+            db=db,
+            employee_data=request.employee,
+            contract_data=request.contract,
+            documents_data=[
+                (doc_meta, f"placeholder_{doc_meta.titre}")
+                for doc_meta in request.documents_metadata
+            ],
+            password=request.password,
+            group_id=request.group_id,
+            created_by=current_user
+        )
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Employé créé avec succès",
+            "data": {
+                "employee_id": result["employee"].id,
+                "user_id": result["user"].id,
+                "contract_id": result["contract"].id,
+                "documents_count": len(result["documents"]),
+                "group_assigned": result["group_assigned"],
+                "service_group_created": result["service_group_created"]
+            }
+        }
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+
+
+@employe_router.get("/{employee_id}", response_model=schemas.EmployeResponse)
+async def get_employee(
+    employee_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get employee by ID with optional relation expansion"""
+    employee = await EmployeeService.get_with_relations(
+        db, employee_id, expand=expand
+    )
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    return employee
+
+
+@employe_router.put("/{employee_id}", response_model=schemas.EmployeResponse)
+async def update_employee(
+    employee_id: int,
+    employee_update: schemas.EmployeUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update employee"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Employe).where(Employe.id == employee_id)
+    )
+    employee = result.scalar_one_or_none()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    # Capture old values before update
+    old_values = AuditService._extract_model_values(employee)
+
+    for key, value in employee_update.model_dump(exclude_unset=True).items():
+        setattr(employee, key, value)
+
+    await db.commit()
+    await db.refresh(employee)
+
+    # Log the update
+    await AuditService.log_model_change(
+        db=db,
+        user=current_user,
+        instance=employee,
+        action="UPDATE",
+        old_values=old_values,
+        request=request
+    )
+
+    return employee
+
+
+@employe_router.delete("/{employee_id}")
+async def delete_employee(
+    employee_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete employee"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(Employe).where(Employe.id == employee_id)
+    )
+    employee = result.scalar_one_or_none()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    # Capture old values before deletion
+    old_values = AuditService._extract_model_values(employee)
+
+    await db.delete(employee)
+    await db.commit()
+
+    # Log the deletion
+    await AuditService.log_action(
+        db=db,
+        user=current_user,
+        action="DELETE",
+        resource_type="employe",
+        resource_id=str(employee_id),
+        old_values=old_values,
+        request=request
+    )
+
+    return {"message": "Employee deleted successfully"}
+
+
+@employe_router.get("/export")
+async def export_employees(
+    format: str = Query("excel", pattern="^(excel|csv|json)$"),
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Export employees data
+
+    Supported formats: excel, csv, json
+    """
+    # Get all employees (in a real implementation, apply filters)
+    result = await db.execute(select(Employe))
+    employees = result.scalars().all()
+
+    # Log the export
+    await AuditService.log_export(
+        db=db,
+        user=current_user,
+        resource_type="employe",
+        format_type=format,
+        count=len(employees),
+        request=request
+    )
+
+    # Return placeholder response (actual export implementation would go here)
+    return {
+        "message": f"Export {format} requested",
+        "count": len(employees),
+        "format": format
+    }
+
+
+# ************************************************************************
+# PERMISSION ROUTES
+# ************************************************************************
+
+permission_router = APIRouter(prefix="/permissions", tags=["Permissions"])
+
+
+@permission_router.get("/")
+async def list_permissions(
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all permissions with optional pagination and expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Permission).order_by(Permission.resource, Permission.action)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Permission, expand_fields)
+
+    # Get total count
+    count_query = select(func.count()).select_from(Permission)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        permissions = result.scalars().all()
+        return {
+            "results": list(permissions),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        permissions = result.scalars().all()
+        return {
+            "results": list(permissions),
+            "total": total
+        }
+
+
+@permission_router.get("/{permission_id}", response_model=schemas.PermissionResponse)
+async def get_permission(
+    permission_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get permission by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Permission).where(Permission.id == permission_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Permission, expand_fields)
+
+    result = await db.execute(query)
+    permission = result.scalar_one_or_none()
+    if not permission:
+        raise HTTPException(status_code=404, detail="Permission not found")
+    return permission
+
+
+@permission_router.post("/", response_model=schemas.PermissionResponse, status_code=status.HTTP_201_CREATED)
+async def create_permission(
+    permission: schemas.PermissionCreate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Create a new permission"""
+    # Check if permission already exists
+    result = await db.execute(
+        select(Permission).where(
+            Permission.resource == permission.resource,
+            Permission.action == permission.action
+        )
+    )
+    existing_permission = result.scalar_one_or_none()
+    if existing_permission:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Permission for resource '{permission.resource}' with action '{permission.action}' already exists"
+        )
+
+    db_permission = Permission(**permission.model_dump())
+    db.add(db_permission)
+    await db.commit()
+    await db.refresh(db_permission)
+    return db_permission
+
+
+# ************************************************************************
+# GROUP PERMISSION ROUTES
+# ************************************************************************
+
+group_permission_router = APIRouter(
+    prefix="/group-permissions",
+    tags=["Group Permissions"]
+)
+
+
+@group_permission_router.get("/")
+async def list_group_permissions(
+    group_id: Optional[int] = Query(None),
+    permission_id: Optional[int] = Query(None),
+    granted: Optional[bool] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """List group permissions with filters, pagination, and expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(GroupPermission)
+
+    # Apply filters
+    if group_id is not None:
+        query = query.where(GroupPermission.group_id == group_id)
+    if permission_id is not None:
+        query = query.where(GroupPermission.permission_id == permission_id)
+    if granted is not None:
+        query = query.where(GroupPermission.granted == granted)
+
+    # Get total count (before expansion to avoid unnecessary joins)
+    count_query = select(func.count()).select_from(GroupPermission)
+    if group_id is not None:
+        count_query = count_query.where(GroupPermission.group_id == group_id)
+    if permission_id is not None:
+        count_query = count_query.where(GroupPermission.permission_id == permission_id)
+    if granted is not None:
+        count_query = count_query.where(GroupPermission.granted == granted)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, GroupPermission, expand_fields)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        group_permissions = result.scalars().all()
+        return {
+            "results": list(group_permissions),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        group_permissions = result.scalars().all()
+        return {
+            "results": list(group_permissions),
+            "total": total
+        }
+
+
+@group_permission_router.get(
+    "/{group_permission_id}",
+    response_model=schemas.GroupPermissionResponse
+)
+async def get_group_permission(
+    group_permission_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get group permission by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(GroupPermission).where(GroupPermission.id == group_permission_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, GroupPermission, expand_fields)
+
+    result = await db.execute(query)
+    group_permission = result.scalar_one_or_none()
+    if not group_permission:
+        raise HTTPException(status_code=404, detail="Group permission not found")
+    return group_permission
+
+
+@group_permission_router.post(
+    "/",
+    response_model=schemas.GroupPermissionResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_group_permission(
+    group_permission: schemas.GroupPermissionCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a group permission assignment"""
+    try:
+        db_group_permission = await PermissionService.create_group_permission(
+            db,
+            group_id=group_permission.group_id,
+            permission_id=group_permission.permission_id,
+            granted=group_permission.granted,
+            created_by_id=current_user.id
+        )
+        await db.commit()
+        await db.refresh(db_group_permission)
+        return db_group_permission
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        ) from e
+
+
+@group_permission_router.put(
+    "/{group_permission_id}",
+    response_model=schemas.GroupPermissionResponse
+)
+async def update_group_permission(
+    group_permission_id: int,
+    group_permission_update: schemas.GroupPermissionUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Update group permission (granted flag)"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(GroupPermission).where(GroupPermission.id == group_permission_id)
+    )
+    group_permission = result.scalar_one_or_none()
+    if not group_permission:
+        raise HTTPException(status_code=404, detail="Group permission not found")
+
+    if group_permission_update.granted is not None:
+        group_permission.granted = group_permission_update.granted
+
+    await db.commit()
+    await db.refresh(group_permission)
+    return group_permission
+
+
+@group_permission_router.delete("/{group_permission_id}")
+async def delete_group_permission(
+    group_permission_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Delete group permission"""
+    from sqlalchemy import select
+    result = await db.execute(
+        select(GroupPermission).where(GroupPermission.id == group_permission_id)
+    )
+    group_permission = result.scalar_one_or_none()
+    if not group_permission:
+        raise HTTPException(status_code=404, detail="Group permission not found")
+
+    await db.delete(group_permission)
+    await db.commit()
+    return {"message": "Group permission deleted successfully"}
+
+
+@group_permission_router.get(
+    "/users/{user_id}/permissions",
+    response_model=schemas.UserPermissionsResponse
+)
+async def get_user_permissions(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    # _current_user: User = Depends(get_current_user)
+):
+    """Get user's effective permissions based on group memberships"""
+    from sqlalchemy import select
+    # Validate user exists
+    result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Get effective permissions
+    permissions_data = await PermissionService.get_effective_permissions(db, user_id)
+    return permissions_data
+
+
+# ************************************************************************
+# CONTRAT ROUTES
+# ************************************************************************
+
+contrat_router = APIRouter(prefix="/contracts", tags=["Contracts"])
+
+
+@contrat_router.get("/")
+async def list_contracts(
+    employe_id: Optional[int] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """List contracts with optional filters and pagination"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Contrat)
+
+    # Apply filters
+    if employe_id is not None:
+        query = query.where(Contrat.employe_id == employe_id)
+    if is_active is not None:
+        query = query.where(Contrat.is_active == is_active)
+
+    # Get total count (before expansion to avoid unnecessary joins)
+    count_query = select(func.count()).select_from(Contrat)
+    if employe_id is not None:
+        count_query = count_query.where(Contrat.employe_id == employe_id)
+    if is_active is not None:
+        count_query = count_query.where(Contrat.is_active == is_active)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Contrat, expand_fields)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        contracts = result.scalars().all()
+        return {
+            "results": list(contracts),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        contracts = result.scalars().all()
+        return {
+            "results": list(contracts),
+            "total": total
+        }
+
+
+@contrat_router.post(
+    "/",
+    response_model=schemas.ContratResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_contract(
+    contract: schemas.ContratCreate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Create a new contract"""
+    # Validate employee exists
+    if contract.employe_id:
+        result = await db.execute(
+            select(Employe).where(Employe.id == contract.employe_id)
+        )
+        if not result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Employee with ID {contract.employe_id} not found"
+            )
+
+    db_contract = Contrat(**contract.model_dump())
+    db.add(db_contract)
+    await db.commit()
+    await db.refresh(db_contract)
+    return db_contract
+
+
+@contrat_router.get("/{contract_id}", response_model=schemas.ContratResponse)
+async def get_contract(
+    contract_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Get contract by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Contrat).where(Contrat.id == contract_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Contrat, expand_fields)
+
+    result = await db.execute(query)
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+    return contract
+
+
+@contrat_router.put("/{contract_id}", response_model=schemas.ContratResponse)
+async def update_contract(
+    contract_id: int,
+    contract_update: schemas.ContratUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Update contract"""
+    result = await db.execute(
+        select(Contrat).where(Contrat.id == contract_id)
+    )
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    # Update fields
+    update_data = contract_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(contract, key, value)
+
+    await db.commit()
+    await db.refresh(contract)
+    return contract
+
+
+@contrat_router.delete("/{contract_id}")
+async def delete_contract(
+    contract_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Delete contract"""
+    result = await db.execute(
+        select(Contrat).where(Contrat.id == contract_id)
+    )
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    await db.delete(contract)
+    await db.commit()
+    return {"message": "Contract deleted successfully"}
+
+
+# ************************************************************************
+# USER ROUTES
+# ************************************************************************
+
+user_router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@user_router.get("/")
+async def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    # _current_user: User = Depends(get_current_user)
+):
+    """List all users with optional pagination and expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(User)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, User, expand_fields)
+
+    # Get total count
+    count_query = select(func.count(User.id)).select_from(User)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        users = result.scalars().all()
+        return {
+            "results": list(users),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        users = result.scalars().all()
+        return {
+            "results": list(users),
+            "total": total
+        }
+
+
+@user_router.post("/", response_model=schemas.UserResponse)
+async def create_user(
+    user: schemas.UserCreate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    # current_user: User = Depends(get_current_user)
+):
+    """Create a new user"""
+    # Check if email already exists
+    result = await db.execute(
+        select(User).where(User.email == user.email)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    # Hash password
+    hashed_password = get_password_hash(user.password)
+    user_data = user.model_dump()
+    user_data["password"] = hashed_password
+
+    db_user = User(**user_data)
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
+
+    # Log the creation
+    await AuditService.log_model_change(
+        db=db,
+        user=current_user,
+        instance=db_user,
+        action="CREATE",
+        request=request
+    )
+
+    return db_user
+
+
+@user_router.get("/{user_id}", response_model=schemas.UserResponse)
+async def get_user(
+    user_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Get user by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(User).where(User.id == user_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, User, expand_fields)
+
+    result = await db.execute(query)
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+@user_router.put("/{user_id}", response_model=schemas.UserResponse)
+async def update_user(
+    user_id: int,
+    user_update: schemas.UserUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update user"""
+    result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Capture old values before update
+    old_values = AuditService._extract_model_values(user)
+
+    # Update fields
+    update_data = user_update.model_dump(exclude_unset=True)
+
+    # Hash password if provided
+    if "password" in update_data and update_data["password"]:
+        update_data["password"] = get_password_hash(update_data["password"])
+
+    for key, value in update_data.items():
+        setattr(user, key, value)
+
+    await db.commit()
+    await db.refresh(user)
+
+    # Log the update
+    await AuditService.log_model_change(
+        db=db,
+        user=current_user,
+        instance=user,
+        action="UPDATE",
+        old_values=old_values,
+        request=request
+    )
+
+    return user
+
+
+@user_router.delete("/{user_id}")
+async def delete_user(
+    user_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete user"""
+    result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Capture old values before deletion
+    old_values = AuditService._extract_model_values(user)
+
+    await db.delete(user)
+    await db.commit()
+
+    # Log the deletion
+    await AuditService.log_action(
+        db=db,
+        user=current_user,
+        action="DELETE",
+        resource_type="user_management_user",
+        resource_id=str(user_id),
+        old_values=old_values,
+        request=request
+    )
+
+    return {"message": "User deleted successfully"}
+
+
+# ************************************************************************
+# DOCUMENT ROUTES
+# ************************************************************************
+
+document_router = APIRouter(prefix="/documents", tags=["Documents"])
+
+
+@document_router.get("/")
+async def list_documents(
+    employe_id: Optional[int] = Query(None),
+    type_document: Optional[str] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """List documents with optional filters and pagination"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Document)
+
+    # Apply filters
+    if employe_id is not None:
+        query = query.where(Document.employe_id == employe_id)
+    if type_document is not None:
+        query = query.where(Document.type_document == type_document)
+
+    # Get total count (before expansion to avoid unnecessary joins)
+    count_query = select(func.count()).select_from(Document)
+    if employe_id is not None:
+        count_query = count_query.where(Document.employe_id == employe_id)
+    if type_document is not None:
+        count_query = count_query.where(Document.type_document == type_document)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Document, expand_fields)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        documents = result.scalars().all()
+        return {
+            "results": list(documents),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        documents = result.scalars().all()
+        return {
+            "results": list(documents),
+            "total": total
+        }
+
+
+@document_router.post(
+    "/",
+    response_model=schemas.DocumentResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_document(
+    document: schemas.DocumentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new document"""
+    # Validate employee exists
+    result = await db.execute(
+        select(Employe).where(Employe.id == document.employe_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Employee with ID {document.employe_id} not found"
+        )
+
+    db_document = Document(**document.model_dump())
+    db.add(db_document)
+    await db.commit()
+    await db.refresh(db_document)
+    return db_document
+
+
+@document_router.get("/{document_id}", response_model=schemas.DocumentResponse)
+async def get_document(
+    document_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Get document by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(Document).where(Document.id == document_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, Document, expand_fields)
+
+    result = await db.execute(query)
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@document_router.put("/{document_id}", response_model=schemas.DocumentResponse)
+async def update_document(
+    document_id: int,
+    document_update: schemas.DocumentUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Update document"""
+    result = await db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Update fields
+    update_data = document_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(document, key, value)
+
+    await db.commit()
+    await db.refresh(document)
+    return document
+
+
+@document_router.delete("/{document_id}")
+async def delete_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Delete document"""
+    result = await db.execute(
+        select(Document).where(Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    await db.delete(document)
+    await db.commit()
+    return {"message": "Document deleted successfully"}
+
+
+# ************************************************************************
+# USER GROUP ROUTES
+# ************************************************************************
+
+user_group_router = APIRouter(prefix="/user-groups", tags=["User Groups"])
+
+
+@user_group_router.get("/")
+async def list_user_groups(
+    user_id: Optional[int] = Query(None),
+    group_id: Optional[int] = Query(None),
+    is_active: Optional[bool] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    # _current_user: User = Depends(get_current_user)
+):
+    """List user groups with optional filters and pagination"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(UserGroup)
+
+    # Apply filters
+    if user_id is not None:
+        query = query.where(UserGroup.user_id == user_id)
+    if group_id is not None:
+        query = query.where(UserGroup.group_id == group_id)
+    if is_active is not None:
+        query = query.where(UserGroup.is_active == is_active)
+
+    # Get total count (before expansion to avoid unnecessary joins)
+    count_query = select(func.count()).select_from(UserGroup)
+    if user_id is not None:
+        count_query = count_query.where(UserGroup.user_id == user_id)
+    if group_id is not None:
+        count_query = count_query.where(UserGroup.group_id == group_id)
+    if is_active is not None:
+        count_query = count_query.where(UserGroup.is_active == is_active)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, UserGroup, expand_fields)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+        result = await db.execute(query)
+        user_groups = result.scalars().all()
+        return {
+            "results": list(user_groups),
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        result = await db.execute(query)
+        user_groups = result.scalars().all()
+        return {
+            "results": list(user_groups),
+            "total": total
+        }
+
+
+@user_group_router.post(
+    "/",
+    response_model=schemas.UserGroupResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_user_group(
+    user_group: schemas.UserGroupCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a user group assignment"""
+    # Validate user exists
+    result = await db.execute(
+        select(User).where(User.id == user_group.user_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404,
+            detail=f"User with ID {user_group.user_id} not found"
+        )
+
+    # Validate group exists
+    result = await db.execute(
+        select(Group).where(Group.id == user_group.group_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Group with ID {user_group.group_id} not found"
+        )
+
+    # Check for duplicate
+    result = await db.execute(
+        select(UserGroup).where(
+            UserGroup.user_id == user_group.user_id,
+            UserGroup.group_id == user_group.group_id
+        )
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail="User group assignment already exists"
+        )
+
+    # Create user group
+    user_group_data = user_group.model_dump()
+    if not user_group_data.get('assigned_by_id'):
+        user_group_data['assigned_by_id'] = current_user.id
+
+    db_user_group = UserGroup(**user_group_data)
+    db.add(db_user_group)
+    await db.commit()
+    await db.refresh(db_user_group)
+    return db_user_group
+
+
+@user_group_router.get(
+    "/{user_group_id}",
+    response_model=schemas.UserGroupResponse
+)
+async def get_user_group(
+    user_group_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Get user group by ID with optional expansion"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+
+    query = select(UserGroup).where(UserGroup.id == user_group_id)
+
+    # Apply expansion
+    if expand:
+        expand_fields = parse_expand_param(expand)
+        query = apply_expansion(query, UserGroup, expand_fields)
+
+    result = await db.execute(query)
+    user_group = result.scalar_one_or_none()
+    if not user_group:
+        raise HTTPException(status_code=404, detail="User group not found")
+    return user_group
+
+
+@user_group_router.put(
+    "/{user_group_id}",
+    response_model=schemas.UserGroupResponse
+)
+async def update_user_group(
+    user_group_id: int,
+    user_group_update: schemas.UserGroupUpdate,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Update user group (is_active status)"""
+    result = await db.execute(
+        select(UserGroup).where(UserGroup.id == user_group_id)
+    )
+    user_group = result.scalar_one_or_none()
+    if not user_group:
+        raise HTTPException(status_code=404, detail="User group not found")
+
+    # Update fields
+    if user_group_update.is_active is not None:
+        user_group.is_active = user_group_update.is_active
+
+    await db.commit()
+    await db.refresh(user_group)
+    return user_group
+
+
+@user_group_router.delete("/{user_group_id}")
+async def delete_user_group(
+    user_group_id: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """Delete user group"""
+    result = await db.execute(
+        select(UserGroup).where(UserGroup.id == user_group_id)
+    )
+    user_group = result.scalar_one_or_none()
+    if not user_group:
+        raise HTTPException(status_code=404, detail="User group not found")
+
+    await db.delete(user_group)
+    await db.commit()
+    return {"message": "User group deleted successfully"}
+
+
+# Include all routers
+def get_user_app_router():
+    """Get combined router for user_app"""
+    main_router = APIRouter()
+    main_router.include_router(auth_router)
+    main_router.include_router(service_router)
+    main_router.include_router(service_group_router)
+    main_router.include_router(group_router)
+    main_router.include_router(employe_router)
+    main_router.include_router(permission_router)
+    main_router.include_router(group_permission_router)
+    main_router.include_router(user_router)
+    main_router.include_router(user_group_router)
+    main_router.include_router(contrat_router)
+    main_router.include_router(document_router)
+    return main_router
+
