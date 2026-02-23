@@ -75,6 +75,10 @@ async def get_current_user(
 ):
     """
     Dependency to get current authenticated user from JWT token
+    
+    Respects configuration settings:
+    - If AUTHENTICATION_ENABLED=False: Returns mock superuser without checking token
+    - If AUTHENTICATION_ENABLED=True: Validates token and returns authenticated user
 
     Usage:
         @router.get("/protected")
@@ -86,6 +90,19 @@ async def get_current_user(
     """
     from app.user_app.models import User
     from app.core.database import get_db
+    from app.core.config import settings
+
+    # If authentication is disabled, return mock superuser
+    if not settings.AUTHENTICATION_ENABLED:
+        mock_user = User(
+            id=0,
+            email="system@localhost",
+            nom="System",
+            prenom="User",
+            is_active=True,
+            is_superuser=True
+        )
+        return mock_user
 
     # Get database session
     async for session in get_db():

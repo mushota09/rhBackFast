@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.config import settings
 from app.user_app.models import User
 from app.user_app.services import PermissionService
 
@@ -11,6 +12,11 @@ from app.user_app.services import PermissionService
 def require_permission(resource: str, action: str):
     """
     Dependency factory to check if user has required permission
+    
+    Respects configuration settings:
+    - If AUTHENTICATION_ENABLED=False: Returns mock superuser
+    - If PERMISSION_CHECK_ENABLED=False: Returns authenticated user without permission check
+    - If both enabled: Checks permissions normally
 
     Args:
         resource: Resource name (e.g., 'employe', 'user', 'payroll')
@@ -29,12 +35,29 @@ def require_permission(resource: str, action: str):
             ...
 
     Raises:
-        HTTPException: 403 Forbidden if user does not have permission
+        HTTPException: 401 if authentication required but not provided
+        HTTPException: 403 if permission check enabled and user lacks permission
     """
     async def permission_checker(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
     ) -> User:
+        # If authentication is disabled, return mock superuser
+        if not settings.AUTHENTICATION_ENABLED:
+            mock_user = User(
+                id=0,
+                email="system@localhost",
+                nom="System",
+                prenom="User",
+                is_active=True,
+                is_superuser=True
+            )
+            return mock_user
+        
+        # If permission checks are disabled, return user without checking
+        if not settings.PERMISSION_CHECK_ENABLED:
+            return current_user
+        
         # Superusers bypass all permission checks
         if current_user.is_superuser:
             return current_user
@@ -63,6 +86,11 @@ async def check_permission_or_403(
 ) -> None:
     """
     Helper function to check permission and raise 403 if denied
+    
+    Respects configuration settings:
+    - If AUTHENTICATION_ENABLED=False: Always passes
+    - If PERMISSION_CHECK_ENABLED=False: Always passes
+    - If both enabled: Checks permissions normally
 
     Args:
         db: Database session
@@ -71,7 +99,7 @@ async def check_permission_or_403(
         action: Action name
 
     Raises:
-        HTTPException: 403 Forbidden if user does not have permission
+        HTTPException: 403 Forbidden if permission check enabled and user lacks permission
 
     Usage:
         async def some_function(db: AsyncSession, user: User):
@@ -81,6 +109,10 @@ async def check_permission_or_403(
             # Proceed with logic
             ...
     """
+    # Skip if authentication or permission checks are disabled
+    if not settings.AUTHENTICATION_ENABLED or not settings.PERMISSION_CHECK_ENABLED:
+        return
+    
     if user.is_superuser:
         return
 
