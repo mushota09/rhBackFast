@@ -226,4 +226,8 @@ consignes:
 4 verifier les erreurs de syntaxe
 
 
+
+fais moi un portofolio sur base de l'image que je viens de te partager / nom:mushota raphael ,email:mushota09@gmail.com,github:https://github.com/mushota09/, linkdin:www.linkedin.com/in/raph-mushota-ab8925378,ma_photo:https://drive.google.com/file/d/11b0ktr8i4tsXWsqVOyYfMGGCg7jIJJHu/view?usp=sharing , mes competences: ## MES COMPÉTENCES TECHNIQUES ### 🔹 Backend & API - **Django & Django REST Framework** – APIs performantes et sécurisées - **FastAPI** – Microservices et endpoints ultra rapides - **Node.js & Express** – Backend scalable et event-driven ### 🔹 Bases de données - **PostgreSQL** – Schémas normalisés, transactions ACID, optimisation de requêtes, multi-tenant - **MySQL** – Applications CRUD haute performance, réplication et contraintes relationnelles - **MongoDB** – Modélisation document, agrégations complexes, stockage flexible JSON ### 🔹 Caching & Messaging - **Redis** – Cache API, rate limiting, session store, pub/sub, file d’attente légère - **Kafka** – Communication événementielle entre microservices, event-driven architecture ### 🔹 Architecture & Design - Microservices et monolithe modulaire - Event-driven architecture & async processing - Multi-tenancy et isolation de données - RBAC & JWT Auth - Conception d’APIs performantes et scalables ### 🔹 DevOps & Deployment - **Docker & Docker Compose** - **Nginx** – Reverse proxy et load balancing - CI/CD (GitHub Actions, GitLab CI) - Monitoring & logging structuré - Linux server management.
+
+
 https://rhbackfast.onrender.com/docs
