@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
-        "https://hr-m-syst.vercel.app'",
+        "https://hr-m-syst.vercel.app",
 
     ]
 
