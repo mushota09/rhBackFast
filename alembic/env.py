@@ -27,6 +27,9 @@ from app.paie_app.models import (
     Alert, RetenueEmploye, PeriodePaie, EntreePaie
 )
 from app.reset_password_app.models import PasswordResetOTP
+from app.conge_app.models import (
+    TypeConge, JourFerie, DemandeConge, SoldeConge, HistoriqueConge
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

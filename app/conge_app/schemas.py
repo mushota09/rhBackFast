@@ -62,6 +62,14 @@ class TypeCongeResponse(TypeCongeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaginatedTypeConge(BaseModel):
+    """Schema for paginated TypeConge list"""
+    items: List[TypeCongeResponse]
+    total: int
+    skip: int
+    limit: int
+
+
 class DemandeCongeBase(BaseModel):
     """Base schema for DemandeConge"""
     employe_id: int = Field(..., description="ID de l'employé")
@@ -136,6 +144,14 @@ class DemandeCongeResponse(DemandeCongeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaginatedDemandeConge(BaseModel):
+    """Schema for paginated DemandeConge list"""
+    items: List[DemandeCongeResponse]
+    total: int
+    skip: int
+    limit: int
+
+
 class ApproveRejectRequest(BaseModel):
     """Schema for approve/reject request"""
     commentaire: Optional[str] = Field(None, description="Commentaire de validation")
@@ -180,6 +196,21 @@ class SoldeCongeResponse(SoldeCongeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaginatedSoldeConge(BaseModel):
+    """Schema for paginated SoldeConge list"""
+    items: List[SoldeCongeResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class BulkCreateSoldeRequest(BaseModel):
+    """Schema for bulk creating soldes for all employees"""
+    annee: int = Field(..., ge=2000, le=2100, description="Année du solde")
+    type_conge_id: int = Field(..., description="ID du type de congé")
+    alloue: float = Field(..., ge=0, description="Jours alloués")
+
+
 
 # ============================================================================
 # HistoriqueConge Schemas
@@ -200,6 +231,14 @@ class HistoriqueCongeResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedHistoriqueConge(BaseModel):
+    """Schema for paginated HistoriqueConge list"""
+    items: List[HistoriqueCongeResponse]
+    total: int
+    skip: int
+    limit: int
 
 
 # ============================================================================
@@ -238,3 +277,39 @@ class JourFerieResponse(JourFerieBase):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+
+# ============================================================================
+# Statistics Schemas
+# ============================================================================
+
+class CongeStatsResponse(BaseModel):
+    """Schema for global leave statistics"""
+    total_demandes: int = Field(description="Total number of leave requests")
+    demandes_par_statut: dict = Field(description="Leave requests grouped by status")
+    jours_moyens_par_employe: float = Field(description="Average days per employee")
+    taux_utilisation: float = Field(description="Utilization rate (percentage)")
+
+
+class EmployeStatsResponse(BaseModel):
+    """Schema for employee leave statistics"""
+    employe_id: int
+    total_demandes: int
+    demandes_approuvees: int
+    demandes_en_attente: int
+    demandes_rejetees: int
+    jours_utilises: float
+    jours_restants: float
+    taux_utilisation: float
+
+
+class ServiceStatsResponse(BaseModel):
+    """Schema for service leave statistics"""
+    service_id: int
+    total_employes: int
+    total_demandes: int
+    demandes_approuvees: int
+    demandes_en_attente: int
+    jours_moyens_par_employe: float
+    taux_utilisation_moyen: float

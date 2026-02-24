@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     ]
 
     # Permissions
-    AUTO_CREATE_PERMISSIONS: bool = True  # Set to False in production
+    AUTO_CREATE_PERMISSIONS: bool = True
+
 
     # Email/SMTP Configuration
     SMTP_HOST: str = ""  # e.g., "smtp.gmail.com"

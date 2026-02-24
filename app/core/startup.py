@@ -2,7 +2,7 @@
 Application startup tasks
 
 This module handles tasks that should run when the application starts,
-such as creating default permissions.
+such as creating default permissions and loading default holidays.
 """
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -12,6 +12,30 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.database import Base
 from app.user_app.models import Permission
+from app.conge_app.models import JourFerie
+from app.conge_app.services.holiday_service import HolidayService
+from app.conge_app.constants import PERMISSIONS as CONGE_PERMISSIONS
+
+
+# Audit app permissions
+AUDIT_PERMISSIONS = {
+    "audit.view": "Consulter les logs d'audit",
+}
+
+# Paie app permissions
+PAIE_PERMISSIONS = {
+    "alert.view": "Consulter les alertes",
+    "alert.create": "Créer des alertes",
+    "alert.update": "Modifier des alertes",
+    "retenue.view": "Consulter les retenues",
+    "retenue.create": "Créer des retenues",
+    "periode.view": "Consulter les périodes de paie",
+    "periode.create": "Créer des périodes de paie",
+    "periode.update": "Modifier des périodes de paie",
+    "entree.view": "Consulter les entrées de paie",
+    "entree.update": "Modifier les entrées de paie",
+    "payroll.view": "Consulter et exporter la paie",
+}
 
 
 # Model to resource name mapping (customize as needed)
@@ -91,7 +115,7 @@ def get_permission_description(resource: str, action: str) -> str:
 
 async def create_default_permissions():
     """
-    Create default CRUD permissions for all models.
+    Create default CRUD permissions for all models + conge_app permissions.
     This runs at application startup if AUTO_CREATE_PERMISSIONS is True.
     """
     if not settings.AUTO_CREATE_PERMISSIONS:
@@ -117,6 +141,7 @@ async def create_default_permissions():
 
     try:
         async with async_session() as session:
+            # Create CRUD permissions for all models
             for model_class in models:
                 resource = get_resource_name(model_class)
                 content_type = CONTENT_TYPE_MAPPING.get(resource, 0)
@@ -150,11 +175,111 @@ async def create_default_permissions():
                     session.add(permission)
                     created_count += 1
 
+            # Create conge_app specific permissions
+            conge_created = 0
+            for codename, description in CONGE_PERMISSIONS.items():
+                # Check if permission already exists
+                result = await session.execute(
+                    select(Permission).where(Permission.codename == codename)
+                )
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    skipped_count += 1
+                    continue
+
+                # Extract resource and action from codename
+                # (e.g., "conge.view" -> resource="conge", action="VIEW")
+                parts = codename.split(".")
+                resource = parts[0]
+                action = parts[1].upper() if len(parts) > 1 else "CUSTOM"
+
+                # Create permission
+                permission = Permission(
+                    codename=codename,
+                    name=description,
+                    content_type=0,  # Custom permission
+                    resource=resource,
+                    action=action,
+                    description=description
+                )
+                session.add(permission)
+                created_count += 1
+                conge_created += 1
+
+            # Create audit_app specific permissions
+            audit_created = 0
+            for codename, description in AUDIT_PERMISSIONS.items():
+                # Check if permission already exists
+                result = await session.execute(
+                    select(Permission).where(Permission.codename == codename)
+                )
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    skipped_count += 1
+                    continue
+
+                # Extract resource and action from codename
+                parts = codename.split(".")
+                resource = parts[0]
+                action = parts[1].upper() if len(parts) > 1 else "CUSTOM"
+
+                # Create permission
+                permission = Permission(
+                    codename=codename,
+                    name=description,
+                    content_type=0,  # Custom permission
+                    resource=resource,
+                    action=action,
+                    description=description
+                )
+                session.add(permission)
+                created_count += 1
+                audit_created += 1
+
+            # Create paie_app specific permissions
+            paie_created = 0
+            for codename, description in PAIE_PERMISSIONS.items():
+                # Check if permission already exists
+                result = await session.execute(
+                    select(Permission).where(Permission.codename == codename)
+                )
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    skipped_count += 1
+                    continue
+
+                # Extract resource and action from codename
+                parts = codename.split(".")
+                resource = parts[0]
+                action = parts[1].upper() if len(parts) > 1 else "CUSTOM"
+
+                # Create permission
+                permission = Permission(
+                    codename=codename,
+                    name=description,
+                    content_type=0,  # Custom permission
+                    resource=resource,
+                    action=action,
+                    description=description
+                )
+                session.add(permission)
+                created_count += 1
+                paie_created += 1
+
             # Commit all permissions
             await session.commit()
 
         if created_count > 0:
             print(f"✅ Created {created_count} new permissions")
+            if conge_created > 0:
+                print(f"   - Conge app: {conge_created} permissions")
+            if audit_created > 0:
+                print(f"   - Audit app: {audit_created} permissions")
+            if paie_created > 0:
+                print(f"   - Paie app: {paie_created} permissions")
         if skipped_count > 0:
             print(f"⏭️  Skipped {skipped_count} existing permissions")
 
@@ -168,12 +293,88 @@ async def create_default_permissions():
         await engine.dispose()
 
 
+async def load_default_holidays():
+    """
+    Load default holidays for supported countries.
+    This runs at application startup if CONGE__HOLIDAYS_AUTO_LOAD is True.
+    """
+    # Vérifier si l'auto-chargement est activé
+    holidays_auto_load = getattr(
+        settings, "CONGE__HOLIDAYS_AUTO_LOAD", True
+    )
+
+    if not holidays_auto_load:
+        print("⏭️  Auto-load holidays disabled")
+        return
+
+    print("\n🎉 Loading default holidays...")
+
+    # Créer engine et session
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
+
+    COUNTRIES = ["CD", "FR", "BE", "BI"]
+    YEARS = [2024, 2025, 2026]
+    total_loaded = 0
+
+    try:
+        async with async_session() as session:
+            for country in COUNTRIES:
+                for year in YEARS:
+                    try:
+                        # Compter avant
+                        stmt = select(JourFerie).where(
+                            JourFerie.pays_code == country,
+                            JourFerie.annee == year
+                        )
+                        result = await session.execute(stmt)
+                        before_count = len(result.scalars().all())
+
+                        # Charger
+                        await HolidayService.load_holidays_for_country(
+                            country, year, session
+                        )
+
+                        # Compter après
+                        result = await session.execute(stmt)
+                        after_count = len(result.scalars().all())
+
+                        loaded = after_count - before_count
+                        total_loaded += loaded
+
+                        if loaded > 0:
+                            msg = (
+                                f"  ✅ {country} {year}: "
+                                f"{loaded} new holidays"
+                            )
+                            print(msg)
+                    except Exception as e:
+                        print(f"  ⚠️  {country} {year}: {e}")
+
+        if total_loaded > 0:
+            print(f"✅ Loaded {total_loaded} new holidays")
+        else:
+            print("⏭️  All holidays already loaded")
+
+        print("✓ Holiday initialization complete\n")
+
+    except Exception as e:
+        print(f"❌ Error loading holidays: {e}\n")
+    finally:
+        await engine.dispose()
+
+
 async def run_startup_tasks():
     """
     Run all startup tasks.
     This is called when the application starts.
     """
     await create_default_permissions()
+    await load_default_holidays()
     # Add other startup tasks here in the future
 
 

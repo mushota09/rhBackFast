@@ -227,7 +227,43 @@ class ValidationService:
             )
 
         # Créer l'entrée d'historique avec action=REJECTED
+        historique = HistoriqueConge(
+            demande_conge_id=demande_id,
+            niveau_validation=demande.niveau_validation_actuel + 1,
+            valideur_id=valideur_id,
+            action=ActionHistorique.REJECTED.value,
+            date_action=datetime.utcnow(),
+            commentaire=commentaire
+        )
+        db.add(historique)
 
+        # Restaurer le solde si déjà déduit
+        # (cela arrive si la demande était APPROVED et est maintenant rejetée)
+        if demande.statut == StatutDemande.APPROVED.value:
+            annee = demande.date_debut.year
+            stmt_solde = select(SoldeConge).where(
+                SoldeConge.employe_id == demande.employe_id,
+                SoldeConge.type_conge_id == demande.type_conge_id,
+                SoldeConge.annee == annee
+            )
+            result_solde = await db.execute(stmt_solde)
+            solde = result_solde.scalar_one_or_none()
+
+            if solde:
+                # Restaurer le solde en soustrayant de utilise
+                solde.utilise -= demande.nb_jours_demandes
+                solde.restant = (
+                    solde.alloue - solde.utilise + solde.reporte
+                )
+
+        # Mettre le statut à REJECTED
+        demande.statut = StatutDemande.REJECTED.value
+        demande.date_decision_finale = datetime.utcnow()
+
+        await db.commit()
+        await db.refresh(demande)
+
+        return demande
 
     @staticmethod
     async def delegate_validation(
@@ -253,8 +289,64 @@ class ValidationService:
         Raises:
             ValueError: Si la demande n'existe pas ou ne peut être déléguée
         """
-        # TODO: Implémenter la logique de délégation
-        raise NotImplementedError(
-            "delegate_validation not yet implemented"
+        from app.user_app.models import User
+
+        # Récupérer la demande
+        stmt = select(DemandeConge).where(DemandeConge.id == demande_id)
+        result = await db.execute(stmt)
+        demande = result.scalar_one_or_none()
+
+        if not demande:
+            raise ValueError(f"Demande {demande_id} non trouvée")
+
+        # Vérifier que la demande peut être déléguée
+        if demande.statut not in [
+            StatutDemande.PENDING.value,
+            StatutDemande.IN_PROGRESS.value
+        ]:
+            raise ValueError(
+                f"Demande {demande_id} ne peut être déléguée "
+                f"(statut: {demande.statut})"
+            )
+
+        # Vérifier que le valideur peut valider au niveau actuel
+        can_validate = await ValidationService.can_user_validate(
+            user_id=valideur_id,
+            demande_id=demande_id,
+            db=db
         )
+
+        if not can_validate:
+            raise ValueError(
+                f"L'utilisateur {valideur_id} ne peut pas valider "
+                f"la demande {demande_id} au niveau actuel"
+            )
+
+        # Vérifier que l'utilisateur délégué existe
+        stmt_user = select(User).where(User.id == delegue_a_id)
+        result_user = await db.execute(stmt_user)
+        delegue_user = result_user.scalar_one_or_none()
+
+        if not delegue_user:
+            raise ValueError(
+                f"L'utilisateur délégué {delegue_a_id} n'existe pas"
+            )
+
+        # Créer l'entrée d'historique avec action=DELEGATED
+        historique = HistoriqueConge(
+            demande_conge_id=demande_id,
+            niveau_validation=demande.niveau_validation_actuel + 1,
+            valideur_id=valideur_id,
+            action=ActionHistorique.DELEGATED.value,
+            date_action=datetime.utcnow(),
+            commentaire=commentaire,
+            delegue_a_id=delegue_a_id
+        )
+        db.add(historique)
+
+        await db.commit()
+        await db.refresh(historique)
+
+        return historique
+
 

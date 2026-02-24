@@ -12,6 +12,7 @@ from app.user_app.routes import get_user_app_router
 from app.paie_app.routes import get_paie_app_router
 from app.audit_app.routes import router as audit_router
 from app.reset_password_app import router as password_reset_router
+from app.conge_app.routes import router as conge_router
 
 # Validate configuration at startup
 validate_configuration()
@@ -60,6 +61,7 @@ app.include_router(get_user_app_router(), prefix="/api")
 app.include_router(get_paie_app_router(), prefix="/api/paie")
 app.include_router(audit_router, prefix="/api")
 app.include_router(password_reset_router)
+app.include_router(conge_router)
 
 
 @app.get("/")

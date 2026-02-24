@@ -18,6 +18,7 @@ from app.user_app.models import Permission
 from app.user_app import models as user_models  # noqa: F401
 from app.paie_app import models as paie_models  # noqa: F401
 from app.audit_app import models as audit_models  # noqa: F401
+from app.conge_app import models as conge_models  # noqa: F401
 
 
 # Model to resource name mapping (customize as needed)
@@ -33,6 +34,11 @@ MODEL_RESOURCE_MAPPING = {
     "Contrat": "contrat",
     "Document": "document",
     "AuditLog": "audit",
+    "TypeConge": "conge_type",
+    "DemandeConge": "conge_demande",
+    "SoldeConge": "conge_solde",
+    "HistoriqueConge": "conge_historique",
+    "JourFerie": "conge_jour_ferie",
 }
 
 # Actions to create for each model
@@ -51,6 +57,11 @@ CONTENT_TYPE_MAPPING = {
     "permission": 9,
     "group_permission": 10,
     "audit": 11,
+    "conge_type": 12,
+    "conge_demande": 13,
+    "conge_solde": 14,
+    "conge_historique": 15,
+    "conge_jour_ferie": 16,
 }
 
 
@@ -147,6 +158,102 @@ async def create_permissions_for_models():
                 session.add(permission)
                 print(f"  ✅ Created: {codename}")
                 created_count += 1
+
+        # Create special conge permissions
+        special_conge_permissions = [
+            {
+                "codename": "conge.view",
+                "name": "View Leave Data",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "VIEW",
+                "description": "Permission to view leave data"
+            },
+            {
+                "codename": "conge.create",
+                "name": "Create Leave Requests",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "CREATE",
+                "description": "Permission to create leave requests"
+            },
+            {
+                "codename": "conge.update",
+                "name": "Update Leave Requests",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "UPDATE",
+                "description": "Permission to update leave requests"
+            },
+            {
+                "codename": "conge.delete",
+                "name": "Delete Leave Requests",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "DELETE",
+                "description": "Permission to delete leave requests"
+            },
+            {
+                "codename": "conge.approve",
+                "name": "Approve Leave Requests",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "APPROVE",
+                "description": "Permission to approve leave requests"
+            },
+            {
+                "codename": "conge.manage_types",
+                "name": "Manage Leave Types",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "MANAGE_TYPES",
+                "description": "Permission to manage leave types"
+            },
+            {
+                "codename": "conge.manage_soldes",
+                "name": "Manage Leave Balances",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "MANAGE_SOLDES",
+                "description": "Permission to manage leave balances"
+            },
+            {
+                "codename": "conge.export",
+                "name": "Export Leave Data",
+                "content_type": 0,
+                "resource": "conge",
+                "action": "EXPORT",
+                "description": "Permission to export leave data"
+            },
+        ]
+
+        print(f"\n📦 Processing special conge permissions")
+        for perm_data in special_conge_permissions:
+            codename = perm_data["codename"]
+
+            # Check if permission already exists
+            result = await session.execute(
+                select(Permission).where(Permission.codename == codename)
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                print(f"  ⏭️  Skipped: {codename} (already exists)")
+                skipped_count += 1
+                continue
+
+            # Create permission
+            permission = Permission(
+                codename=perm_data["codename"],
+                name=perm_data["name"],
+                content_type=perm_data["content_type"],
+                resource=perm_data["resource"],
+                action=perm_data["action"],
+                description=perm_data["description"]
+            )
+            session.add(permission)
+            print(f"  ✅ Created: {codename}")
+            created_count += 1
 
         # Note: Special audit permissions are already created above with standard CRUD actions
 

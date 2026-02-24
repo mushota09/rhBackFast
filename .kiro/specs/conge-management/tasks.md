@@ -126,19 +126,19 @@ Ce plan d'implémentation détaille les étapes pour construire un système comp
   - Sinon: statut=IN_PROGRESS
   - _Requirements: 18.4, 18.7, 4.9_
 
-- [-] 5.4 Implémenter reject_at_level
+- [x] 5.4 Implémenter reject_at_level
   - Créer HistoriqueConge avec action=REJECTED
   - Statut=REJECTED
   - Restaurer solde si déjà déduit
   - _Requirements: 18.5, 4.10_
 
-- [ ] 5.5 Implémenter delegate_validation
+- [x] 5.5 Implémenter delegate_validation
   - Créer HistoriqueConge avec action=DELEGATED
   - Enregistrer delegue_a_id
   - _Requirements: 18.10_
 
-- [ ] 6. Services Métier - DemandeCongeService
-- [ ] 6.1 Implémenter create_demande
+- [x] 6. Services Métier - DemandeCongeService
+- [x] 6.1 Implémenter create_demande
   - Valider employé existe
   - Valider type de congé existe
   - Valider date_debut <= date_fin
@@ -148,205 +148,204 @@ Ce plan d'implémentation détaille les étapes pour construire un système comp
   - Créer la demande avec statut=PENDING
   - _Requirements: 4.1, 4.8, 11.1, 11.2, 11.3, 11.4, 14.1_
 
-- [ ] 6.2 Implémenter update_demande
+- [x] 6.2 Implémenter update_demande
   - Vérifier statut=PENDING (seulement modifiable si en attente)
   - Recalculer jours si dates changent
   - _Requirements: 4.4_
 
-- [ ] 6.3 Implémenter cancel_demande
+- [x] 6.3 Implémenter cancel_demande
   - Statut=CANCELLED
   - Restaurer solde si déjà déduit
   - _Requirements: 4.5, 4.10_
 
-- [ ] 6.4 Implémenter list_demandes
+- [x] 6.4 Implémenter list_demandes
   - Supporter filtres: employe_id, type_conge_id, statut, date_debut, date_fin
   - Supporter search sur raison
   - Supporter expand: employe, type_conge, historique
   - Supporter pagination et no_pagination
   - _Requirements: 4.1, 7.1, 8.1, 9.1_
 
-- [ ] 7. Routes API - TypeConge
-- [ ] 7.1 Implémenter GET /api/conge/types
+- [x] 7. Routes API - TypeConge
+- [x] 7.1 Implémenter GET /api/conge/types
   - Liste avec pagination et expand
   - Permission: conge.view
   - _Requirements: 3.1, 7.1, 8.1, 12.1_
 
-- [ ] 7.2 Implémenter POST /api/conge/types
+- [x] 7.2 Implémenter POST /api/conge/types
   - Créer type de congé
   - Permission: conge.manage_types
   - Audit log: CREATE
   - _Requirements: 3.2, 10.1, 12.2_
 
-- [ ] 7.3 Implémenter GET /api/conge/types/{id}
+- [x] 7.3 Implémenter GET /api/conge/types/{id}
   - Détail avec expand
   - Permission: conge.view
   - _Requirements: 3.3, 8.1, 12.1_
 
-- [ ] 7.4 Implémenter PUT /api/conge/types/{id}
+- [x] 7.4 Implémenter PUT /api/conge/types/{id}
   - Modifier type de congé
   - Permission: conge.manage_types
   - Audit log: UPDATE
   - _Requirements: 3.4, 10.2, 12.3_
 
-- [ ] 7.5 Implémenter DELETE /api/conge/types/{id}
+- [x] 7.5 Implémenter DELETE /api/conge/types/{id}
   - Vérifier aucune demande active liée
   - Permission: conge.manage_types
   - Audit log: DELETE
   - _Requirements: 3.5, 3.6, 10.3, 12.4_
 
-- [ ] 8. Routes API - DemandeConge
-- [ ] 8.1 Implémenter GET /api/conge/demandes
+- [x] 8. Routes API - DemandeConge
+- [-] 8.1 Implémenter GET /api/conge/demandes
   - Liste avec filtres, search, pagination, expand
   - Permission: conge.view
   - _Requirements: 4.1, 7.1, 8.1, 9.1, 12.1_
 
-- [ ] 8.2 Implémenter POST /api/conge/demandes
+- [x] 8.2 Implémenter POST /api/conge/demandes
   - Créer demande via DemandeCongeService.create_demande
   - Permission: conge.create
   - Audit log: CREATE
   - _Requirements: 4.2, 10.1, 12.2_
 
-- [ ] 8.3 Implémenter GET /api/conge/demandes/{id}
+- [x] 8.3 Implémenter GET /api/conge/demandes/{id}
   - Détail avec expand
   - Permission: conge.view
   - _Requirements: 4.3, 8.1, 12.1_
 
-- [ ] 8.4 Implémenter PUT /api/conge/demandes/{id}
+- [x] 8.4 Implémenter PUT /api/conge/demandes/{id}
   - Modifier via DemandeCongeService.update_demande
   - Permission: conge.update
   - Audit log: UPDATE
   - _Requirements: 4.4, 10.2, 12.3_
 
-- [ ] 8.5 Implémenter DELETE /api/conge/demandes/{id}
+- [x] 8.5 Implémenter DELETE /api/conge/demandes/{id}
   - Annuler via DemandeCongeService.cancel_demande
   - Permission: conge.delete
   - Audit log: DELETE
   - _Requirements: 4.5, 10.3, 12.4_
 
-- [ ] 8.6 Implémenter POST /api/conge/demandes/{id}/approve
+- [x] 8.6 Implémenter POST /api/conge/demandes/{id}/approve
   - Approuver via ValidationService.approve_at_level
   - Permission: conge.approve
   - Audit log: APPROVE
   - _Requirements: 4.6, 10.4, 12.5_
 
-- [ ] 8.7 Implémenter POST /api/conge/demandes/{id}/reject
+- [x] 8.7 Implémenter POST /api/conge/demandes/{id}/reject
   - Rejeter via ValidationService.reject_at_level
   - Permission: conge.approve
   - Audit log: REJECT
   - _Requirements: 4.7, 10.5, 12.5_
 
-- [ ] 8.8 Implémenter POST /api/conge/demandes/{id}/delegate
+- [x] 8.8 Implémenter POST /api/conge/demandes/{id}/delegate
   - Déléguer via ValidationService.delegate_validation
   - Permission: conge.approve
   - Audit log: DELEGATE
   - _Requirements: 18.10_
 
-- [ ] 8.9 Implémenter GET /api/conge/demandes/export
+- [x] 8.9 Implémenter GET /api/conge/demandes/export
   - Exporter en JSON/CSV/Excel
   - Permission: conge.export
   - Audit log: EXPORT
   - _Requirements: 15.1, 15.2, 15.3, 15.4_
 
-- [ ] 9. Routes API - SoldeConge
-- [ ] 9.1 Implémenter GET /api/conge/soldes
+- [x] 9. Routes API - SoldeConge
+- [x] 9.1 Implémenter GET /api/conge/soldes
   - Liste avec filtres, pagination, expand
   - Permission: conge.view
   - _Requirements: 5.1, 7.1, 8.1, 12.1_
 
-- [ ] 9.2 Implémenter POST /api/conge/soldes
+- [x] 9.2 Implémenter POST /api/conge/soldes
   - Créer solde
   - Calculer automatiquement restant
   - Permission: conge.manage_soldes
   - Audit log: CREATE
   - _Requirements: 5.2, 5.6, 10.1, 12.2_
 
-- [ ] 9.3 Implémenter GET /api/conge/soldes/{id}
+- [x] 9.3 Implémenter GET /api/conge/soldes/{id}
   - Détail avec expand
   - Permission: conge.view
   - _Requirements: 5.3, 8.1, 12.1_
 
-- [ ] 9.4 Implémenter PUT /api/conge/soldes/{id}
+- [x] 9.4 Implémenter PUT /api/conge/soldes/{id}
   - Modifier solde
   - Recalculer automatiquement restant
   - Permission: conge.manage_soldes
   - Audit log: UPDATE
   - _Requirements: 5.4, 5.6, 10.2, 12.3_
 
-- [ ] 9.5 Implémenter DELETE /api/conge/soldes/{id}
+- [x] 9.5 Implémenter DELETE /api/conge/soldes/{id}
   - Supprimer solde
   - Permission: conge.manage_soldes
   - Audit log: DELETE
   - _Requirements: 5.5, 10.3, 12.4_
 
-- [ ] 9.6 Implémenter POST /api/conge/soldes/bulk-create
+- [x] 9.6 Implémenter POST /api/conge/soldes/bulk-create
   - Créer soldes pour tous les employés d'une année
   - Permission: conge.manage_soldes
   - _Requirements: 5.7_
 
-- [ ] 10. Routes API - HistoriqueConge et Statistiques
-- [ ] 10.1 Implémenter GET /api/conge/historiques
+- [x] 10. Routes API - HistoriqueConge et Statistiques
+- [x] 10.1 Implémenter GET /api/conge/historiques
   - Liste avec filtres, pagination, expand
   - Permission: conge.view
   - _Requirements: 6.1, 7.1, 8.1, 12.1_
 
-- [ ] 10.2 Implémenter GET /api/conge/historiques/{id}
+- [x] 10.2 Implémenter GET /api/conge/historiques/{id}
   - Détail avec expand
   - Permission: conge.view
   - _Requirements: 6.2, 8.1, 12.1_
 
-- [ ] 10.3 Implémenter GET /api/conge/stats
+- [x] 10.3 Implémenter GET /api/conge/stats
   - Statistiques globales avec filtres
   - Permission: conge.view
   - _Requirements: 19.1, 19.2, 19.3_
 
-- [ ] 10.4 Implémenter GET /api/conge/stats/employe/{id}
+- [x] 10.4 Implémenter GET /api/conge/stats/employe/{id}
   - Statistiques d'un employé
   - Permission: conge.view
   - _Requirements: 19.4_
 
-- [ ] 10.5 Implémenter GET /api/conge/stats/service/{id}
+- [x] 10.5 Implémenter GET /api/conge/stats/service/{id}
   - Statistiques d'un service
   - Permission: conge.view
   - _Requirements: 19.5_
 
-- [ ] 11. Migration de Base de Données
-- [ ] 11.1 Créer la migration Alembic
+- [x] 11. Migration de Base de Données
+- [x] 11.1 Créer la migration Alembic(sans ecraser les migrations(les donnees se trouvant dans la base) des autres tables existants dans la base de donnees)
   - Créer tables: cg_type_conge, cg_jour_ferie, cg_demande_conge, cg_solde_conge, cg_historique_conge
   - Créer index de performance
   - Créer contraintes uniques
   - _Requirements: Infrastructure_
 
-- [ ] 11.2 Tester la migration
-  - Tester upgrade
-  - Tester downgrade
+- [x] 11.2 Tester la migration
+  - Tester si la migration est bien faite
   - Vérifier index créés
   - _Requirements: Infrastructure_
 
-- [ ] 12. Données Initiales
-- [ ] 12.1 Créer les permissions dans create_permissions.py
+- [x] 12. Données Initiales
+- [x] 12.1 Créer les permissions lors du lancement du projet ,il existe deja un script qui fait ca
   - conge.view, conge.create, conge.update, conge.delete
   - conge.approve, conge.manage_types, conge.manage_soldes, conge.export
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 12.2 Créer script de chargement des types de congés
+- [x] 12.2 Créer script de chargement des types de congés
   - Types par défaut: Congé Payé, RTT, Maladie, Maternité, etc.
   - _Requirements: 3.1_
 
-- [ ] 12.3 Créer script de chargement des jours fériés
+- [x] 12.3 Créer script de chargement des jours fériés
   - Charger jours fériés pour CD, FR, BE pour 2024-2026
   - _Requirements: 2.2_
 
-- [ ] 13. Intégration et Configuration
-- [ ] 13.1 Intégrer les routes dans main.py
+- [x] 13. Intégration et Configuration
+- [x] 13.1 Intégrer les routes dans main.py
   - Ajouter router conge_app
   - _Requirements: Infrastructure_
 
-- [ ] 13.2 Ajouter variables d'environnement
+- [x] 13.2 Ajouter variables d'environnement
   - DEFAULT_COUNTRY_CODE, HOLIDAYS_AUTO_LOAD, MAX_VALIDATION_LEVELS
   - MAX_DOCUMENT_SIZE_MB, ALLOWED_DOCUMENT_TYPES
   - _Requirements: Infrastructure_
 
-- [ ] 13.3 Mettre à jour la documentation API
+- [x] 13.3 Mettre à jour la documentation API
   - Ajouter exemples dans docstrings
   - Vérifier OpenAPI/Swagger
   - _Requirements: Infrastructure_

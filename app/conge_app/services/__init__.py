@@ -5,11 +5,13 @@ from app.conge_app.services.calculation_service import (
 )
 from app.conge_app.services.validation_service import ValidationService
 from app.conge_app.services.demande_service import DemandeCongeService
+from app.conge_app.services.solde_service import SoldeCongeService
 
 __all__ = [
     "HolidayService",
     "CongeCalculationService",
     "ValidationService",
     "DemandeCongeService",
+    "SoldeCongeService",
 ]
 
