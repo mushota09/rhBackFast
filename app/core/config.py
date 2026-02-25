@@ -12,11 +12,6 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
-    # Database
-    # DATABASE_URL: str = (
-    #     "postgresql+asyncpg://postgres:postgres@localhost:5432/rh_db"
-    # )
-
     DATABASE_URL: str = (
     "postgresql+asyncpg://neondb_owner:npg_gZ4eYlSdwr3o@ep-tiny-sound-agslibpd-pooler.c-2.eu-central-1.aws.neon.tech/rh_db?ssl=True"
 )
@@ -38,6 +33,21 @@ class Settings(BaseSettings):
     # Permissions
     AUTO_CREATE_PERMISSIONS: bool = True
 
+    # Security System
+    # Enable/disable authentication (JWT token validation)
+    # Set to False for testing/development without authentication
+    AUTHENTICATION_ENABLED: bool = True
+
+    # Enable/disable permission checks
+    # Set to False for development to bypass permission requirements
+    PERMISSION_CHECK_ENABLED: bool = True
+
+    # Leave Management Configuration
+    CONGE__DEFAULT_COUNTRY_CODE: str = "BI"
+    CONGE__HOLIDAYS_AUTO_LOAD: bool = True
+    CONGE__MAX_VALIDATION_LEVELS: int = 5
+    CONGE__MAX_DOCUMENT_SIZE_MB: int = 100
+    CONGE__ALLOWED_DOCUMENT_TYPES: str = "pdf,jpg,jpeg,png"
 
     # Email/SMTP Configuration
     SMTP_HOST: str = ""  # e.g., "smtp.gmail.com"
