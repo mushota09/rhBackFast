@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # Enable/disable permission checks
     # Set to False for development to bypass permission requirements
-    PERMISSION_CHECK_ENABLED: bool = True
+    PERMISSION_CHECK_ENABLED: bool = False
 
     # Leave Management Configuration
     CONGE__DEFAULT_COUNTRY_CODE: str = "BI"
