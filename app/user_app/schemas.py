@@ -609,3 +609,47 @@ class DocumentUpdate(BaseModel):
     description: Optional[str] = None
     expiry_date: Optional[date] = None
 
+
+
+# ************************************************************************
+# BULK OPERATION SCHEMAS
+# ************************************************************************
+
+class BulkUserGroupAssign(BaseModel):
+    """Schema for bulk assigning users to groups"""
+    user_ids: List[int] = Field(..., min_length=1, description="List of user IDs to assign")
+    group_ids: List[int] = Field(..., min_length=1, description="List of group IDs to assign to")
+    is_active: bool = Field(default=True, description="Whether the assignments should be active")
+    replace_existing: bool = Field(
+        default=False,
+        description="If True, remove existing group assignments for these users before adding new ones"
+    )
+
+
+class BulkUserGroupRemove(BaseModel):
+    """Schema for bulk removing users from groups"""
+    user_ids: List[int] = Field(..., min_length=1, description="List of user IDs")
+    group_ids: List[int] = Field(..., min_length=1, description="List of group IDs to remove from")
+
+
+class BulkGroupPermissionUpdate(BaseModel):
+    """Schema for bulk updating group permissions"""
+    permissions: List[dict] = Field(
+        ...,
+        min_length=1,
+        description="List of permission updates with permission_id and granted status"
+    )
+    # Example: [{"permission_id": 1, "granted": true}, {"permission_id": 2, "granted": false}]
+
+
+class BulkOperationResponse(BaseModel):
+    """Response for bulk operations"""
+    success: bool
+    message: str
+    created_count: int = 0
+    updated_count: int = 0
+    deleted_count: int = 0
+    failed_count: int = 0
+    errors: List[str] = []
+
+    model_config = ConfigDict(from_attributes=True)

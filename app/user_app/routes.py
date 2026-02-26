@@ -1944,6 +1944,311 @@ async def delete_user_group(
     return {"message": "User group deleted successfully"}
 
 
+# ************************************************************************
+# BULK OPERATIONS - USER GROUPS
+# ************************************************************************
+
+@user_group_router.post(
+    "/bulk-assign/",
+    response_model=schemas.BulkOperationResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def bulk_assign_users_to_groups(
+    data: schemas.BulkUserGroupAssign,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Bulk assign users to groups
+    
+    This endpoint allows assigning multiple users to multiple groups in a single operation.
+    
+    Parameters:
+    - user_ids: List of user IDs to assign
+    - group_ids: List of group IDs to assign users to
+    - is_active: Whether the assignments should be active (default: True)
+    - replace_existing: If True, removes existing group assignments for these users first
+    
+    Returns:
+    - BulkOperationResponse with counts of created, updated, and failed operations
+    """
+    created_count = 0
+    updated_count = 0
+    failed_count = 0
+    errors = []
+
+    try:
+        # Validate all users exist
+        for user_id in data.user_ids:
+            result = await db.execute(select(User).where(User.id == user_id))
+            if not result.scalar_one_or_none():
+                errors.append(f"User with ID {user_id} not found")
+                failed_count += 1
+
+        # Validate all groups exist
+        for group_id in data.group_ids:
+            result = await db.execute(select(Group).where(Group.id == group_id))
+            if not result.scalar_one_or_none():
+                errors.append(f"Group with ID {group_id} not found")
+                failed_count += 1
+
+        # If there are validation errors, return early
+        if errors:
+            return schemas.BulkOperationResponse(
+                success=False,
+                message="Validation failed",
+                created_count=0,
+                updated_count=0,
+                failed_count=failed_count,
+                errors=errors
+            )
+
+        # If replace_existing is True, remove existing assignments for these users
+        if data.replace_existing:
+            for user_id in data.user_ids:
+                result = await db.execute(
+                    select(UserGroup).where(UserGroup.user_id == user_id)
+                )
+                existing_assignments = result.scalars().all()
+                for assignment in existing_assignments:
+                    await db.delete(assignment)
+
+        # Create assignments for each user-group combination
+        for user_id in data.user_ids:
+            for group_id in data.group_ids:
+                try:
+                    # Check if assignment already exists
+                    result = await db.execute(
+                        select(UserGroup).where(
+                            UserGroup.user_id == user_id,
+                            UserGroup.group_id == group_id
+                        )
+                    )
+                    existing = result.scalar_one_or_none()
+
+                    if existing:
+                        # Update existing assignment
+                        existing.is_active = data.is_active
+                        updated_count += 1
+                    else:
+                        # Create new assignment
+                        user_group = UserGroup(
+                            user_id=user_id,
+                            group_id=group_id,
+                            is_active=data.is_active,
+                            assigned_by_id=current_user.id
+                        )
+                        db.add(user_group)
+                        created_count += 1
+
+                except Exception as e:
+                    errors.append(f"Failed to assign user {user_id} to group {group_id}: {str(e)}")
+                    failed_count += 1
+
+        await db.commit()
+
+        return schemas.BulkOperationResponse(
+            success=True,
+            message=f"Successfully processed {created_count + updated_count} assignments",
+            created_count=created_count,
+            updated_count=updated_count,
+            failed_count=failed_count,
+            errors=errors
+        )
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bulk assignment failed: {str(e)}"
+        ) from e
+
+
+@user_group_router.post(
+    "/bulk-remove/",
+    response_model=schemas.BulkOperationResponse
+)
+async def bulk_remove_users_from_groups(
+    data: schemas.BulkUserGroupRemove,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user)
+):
+    """
+    Bulk remove users from groups
+    
+    This endpoint allows removing multiple users from multiple groups in a single operation.
+    
+    Parameters:
+    - user_ids: List of user IDs
+    - group_ids: List of group IDs to remove users from
+    
+    Returns:
+    - BulkOperationResponse with count of deleted assignments
+    """
+    deleted_count = 0
+    failed_count = 0
+    errors = []
+
+    try:
+        # Remove assignments for each user-group combination
+        for user_id in data.user_ids:
+            for group_id in data.group_ids:
+                try:
+                    result = await db.execute(
+                        select(UserGroup).where(
+                            UserGroup.user_id == user_id,
+                            UserGroup.group_id == group_id
+                        )
+                    )
+                    user_group = result.scalar_one_or_none()
+
+                    if user_group:
+                        await db.delete(user_group)
+                        deleted_count += 1
+                    else:
+                        errors.append(
+                            f"Assignment not found for user {user_id} and group {group_id}"
+                        )
+                        failed_count += 1
+
+                except Exception as e:
+                    errors.append(
+                        f"Failed to remove user {user_id} from group {group_id}: {str(e)}"
+                    )
+                    failed_count += 1
+
+        await db.commit()
+
+        return schemas.BulkOperationResponse(
+            success=True,
+            message=f"Successfully removed {deleted_count} assignments",
+            deleted_count=deleted_count,
+            failed_count=failed_count,
+            errors=errors
+        )
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bulk removal failed: {str(e)}"
+        ) from e
+
+
+# ************************************************************************
+# BULK OPERATIONS - GROUP PERMISSIONS
+# ************************************************************************
+
+@group_permission_router.post(
+    "/bulk-update/{group_id}/",
+    response_model=schemas.BulkOperationResponse
+)
+async def bulk_update_group_permissions(
+    group_id: int,
+    data: schemas.BulkGroupPermissionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Bulk update group permissions
+    
+    This endpoint allows updating multiple permissions for a group in a single operation.
+    
+    Parameters:
+    - group_id: The group ID to update permissions for
+    - permissions: List of permission updates with permission_id and granted status
+      Example: [{"permission_id": 1, "granted": true}, {"permission_id": 2, "granted": false}]
+    
+    Returns:
+    - BulkOperationResponse with counts of created, updated, and failed operations
+    """
+    created_count = 0
+    updated_count = 0
+    failed_count = 0
+    errors = []
+
+    try:
+        # Validate group exists
+        result = await db.execute(select(Group).where(Group.id == group_id))
+        group = result.scalar_one_or_none()
+        if not group:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Group with ID {group_id} not found"
+            )
+
+        # Process each permission update
+        for perm_data in data.permissions:
+            try:
+                permission_id = perm_data.get("permission_id")
+                granted = perm_data.get("granted", True)
+
+                if not permission_id:
+                    errors.append("Missing permission_id in permission data")
+                    failed_count += 1
+                    continue
+
+                # Validate permission exists
+                result = await db.execute(
+                    select(Permission).where(Permission.id == permission_id)
+                )
+                permission = result.scalar_one_or_none()
+                if not permission:
+                    errors.append(f"Permission with ID {permission_id} not found")
+                    failed_count += 1
+                    continue
+
+                # Check if group permission already exists
+                result = await db.execute(
+                    select(GroupPermission).where(
+                        GroupPermission.group_id == group_id,
+                        GroupPermission.permission_id == permission_id
+                    )
+                )
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    # Update existing permission
+                    existing.granted = granted
+                    updated_count += 1
+                else:
+                    # Create new group permission
+                    group_permission = GroupPermission(
+                        group_id=group_id,
+                        permission_id=permission_id,
+                        granted=granted,
+                        created_by_id=current_user.id
+                    )
+                    db.add(group_permission)
+                    created_count += 1
+
+            except Exception as e:
+                errors.append(
+                    f"Failed to update permission {perm_data.get('permission_id')}: {str(e)}"
+                )
+                failed_count += 1
+
+        await db.commit()
+
+        return schemas.BulkOperationResponse(
+            success=True,
+            message=f"Successfully processed {created_count + updated_count} permissions",
+            created_count=created_count,
+            updated_count=updated_count,
+            failed_count=failed_count,
+            errors=errors
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bulk permission update failed: {str(e)}"
+        ) from e
+
+
 # Include all routers
 def get_user_app_router():
     """Get combined router for user_app"""
