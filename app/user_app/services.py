@@ -157,8 +157,8 @@ class EmployeeService:
             return employee
         except IntegrityError as e:
             await db.rollback()
-            if "email_professionnel" in str(e):
-                raise ValueError("L'email professionnel est déjà utilisé") from e
+            # if "email_professionnel" in str(e):
+                # raise ValueError("L'email professionnel est déjà utilisé") from e
             raise ValueError(f"Erreur lors de la création de l'employé: {str(e)}") from e
 
     async def create_employee_with_user(

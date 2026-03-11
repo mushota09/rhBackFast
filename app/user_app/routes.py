@@ -14,6 +14,7 @@ from app.core.security import (
     verify_token,
     get_current_user
 )
+from app.core.permissions import require_permission
 from app.user_app import schemas
 from app.user_app.models import Service, Group, ServiceGroup, User, Employe, Permission, GroupPermission, UserGroup, Contrat, Document
 from app.user_app.services import EmployeeService, GroupService, PermissionService
@@ -737,7 +738,7 @@ async def create_employee_with_user(
     employee: schemas.EmployeCreateWithUser,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "CREATE"))
 ):
     """
     Create employee with user account and optional group assignment
@@ -747,6 +748,8 @@ async def create_employee_with_user(
     2. Create user account linked to employee
     3. Optionally assign user to a group (if group_id provided)
     4. Send welcome email with credentials
+
+    Required permission: employe.CREATE
     """
     try:
         result = await EmployeeService.create_employee_with_user(
@@ -776,7 +779,7 @@ async def create_complete_employee(
     request: schemas.CompleteEmployeeRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "CREATE"))
 ):
     """
     Create complete employee with contract, documents, user account,
@@ -793,6 +796,8 @@ async def create_complete_employee(
 
     All operations are performed in a single transaction.
     If any step fails, all changes are rolled back.
+
+    Required permission: employe.CREATE
     """
     try:
         result = await EmployeeService.create_complete_employee(
