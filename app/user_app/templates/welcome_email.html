@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenue - Compte créé</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #F0FFFF; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 30px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px 10px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">
+                                🎉 Bienvenue !
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                Bonjour <strong>{{ user_name }}</strong>,
+                            </p>
+
+                            <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                Votre compte a été créé avec succès dans le système RH Management. Vous pouvez maintenant accéder à votre espace personnel.
+                            </p>
+
+                            <!-- Credentials Box -->
+                            <div style="background-color: #ffffff; border: 2px solid #667eea; border-radius: 8px; padding: 25px; margin: 30px 0;">
+                                <h2 style="margin: 0 0 20px 0; color: #667eea; font-size: 20px; text-align: center;">
+                                    🔐 Vos identifiants de connexion
+                     {{ user_email }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 10px 0; font-weight: bold; color: #555555;">
+                                            🔑 Mot de passe :
+                                        </td>
+                                        <td style="padding: 10px 0;">
+                                            <code style="background-color: #f8f9fa; padding: 8px 12px; border-radius: 4px; font-size: 16px; color: #667eea; font-weight: bold; letter-spacing: 1px;">{{ password }}</code>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Security Warning -->
+                            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                                <p style="margin: 0; font-size: 14px; color: #856404;">
+                                    <strong>🔒 Important :</strong> Pour votre sécurité, nous vous recommandons fortement de changer votre mot de passe lors de votre première connexion.
+                                </p>
+                            </div>
+
+                            <p style="margin: 20px 0 0 0; font-size: 16px; line-height: 1.6; color: #333333;">
+                                Si vous avez des questions ou besoin d'assistance, n'hésitez pas à contacter votre administrateur système.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #e8f4f8; border-radius: 0 0 10px 10px; text-align: center;">
+                            <p style="margin: 0 0 10px 0; font-size: 14px; color: #666666;">
+                                Cet email a été envoyé automatiquement par le système RH Management.
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #999999;">
+                                © 2024 RH Management System. Tous droits réservés.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

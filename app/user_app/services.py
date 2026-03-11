@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
+from fastapi import BackgroundTasks
 
 from app.user_app.models import (
     Employe, User, Group, UserGroup, ServiceGroup, Service, Contrat, Document,
@@ -17,6 +18,8 @@ from app.core.security import get_password_hash
 from app.core.query_utils import (
     apply_search, apply_ordering, apply_expansion, parse_expand_param
 )
+from app.user_app.email_service import UserEmailService
+
 
 
 class EmployeeService:
@@ -158,11 +161,11 @@ class EmployeeService:
                 raise ValueError("L'email professionnel est déjà utilisé") from e
             raise ValueError(f"Erreur lors de la création de l'employé: {str(e)}") from e
 
-    @staticmethod
     async def create_employee_with_user(
         db: AsyncSession,
         employee_data: EmployeCreateWithUser,
-        created_by: Optional[User] = None
+        created_by: Optional[User] = None,
+        background_tasks: Optional[BackgroundTasks] = None
     ) -> Dict[str, Any]:
         """
         Create employee with user account and optional group assignment
@@ -171,11 +174,13 @@ class EmployeeService:
         1. Create employee
         2. Create user account linked to employee
         3. Optionally assign user to a group
+        4. Send welcome email with credentials
 
         Args:
             db: Database session
             employee_data: Employee creation data with user info
             created_by: User creating the employee (for audit)
+            background_tasks: FastAPI background tasks for email sending
 
         Returns:
             Dictionary with employee, user, and group_assigned status
@@ -183,38 +188,39 @@ class EmployeeService:
         Raises:
             ValueError: If validation fails
         """
-        # Validate poste (ServiceGroup) if provided
-        poste_instance = None
-        if employee_data.poste_id:
-            result = await db.execute(
-                select(ServiceGroup).where(
-                    ServiceGroup.id == employee_data.poste_id
-                )
-            )
-            poste_instance = result.scalar_one_or_none()
-            if not poste_instance:
-                raise ValueError(
-                    f"Poste avec l'ID {employee_data.poste_id} introuvable"
-                )
-
-        # Create employee (without password and poste_id)
-        employee_dict = employee_data.model_dump(
-            exclude={"password"}
-        )
-        employee = await EmployeeService.create_employee(
-            db,
-            EmployeCreate(**employee_dict)
-        )
-
-        # Create user account
-        user_email = employee_data.email_professionnel or employee_data.email_personnel
-
         try:
+            # Validate poste (ServiceGroup) if provided
+            poste_instance = None
+            if employee_data.poste_id:
+                result = await db.execute(
+                    select(ServiceGroup).where(
+                        ServiceGroup.id == employee_data.poste_id
+                    )
+                )
+                poste_instance = result.scalar_one_or_none()
+                if not poste_instance:
+                    raise ValueError(
+                        f"Poste avec l'ID {employee_data.poste_id} introuvable"
+                    )
+
+            # Create employee (without password)
+            employee_dict = employee_data.model_dump(
+                exclude={"password"}
+            )
+            employee = await EmployeeService.create_employee(
+                db,
+                EmployeCreate(**employee_dict)
+            )
+
+            # Create user account
+            user_email = employee_data.email_professionnel or employee_data.email_personnel
+            password = employee_data.password
+
             user = User(
                 email=user_email,
                 nom=employee_data.nom,
                 prenom=employee_data.prenom,
-                password=get_password_hash("12345678"),
+                password=get_password_hash(password),
                 employe_id=employee.id,
                 is_active=True,
                 is_staff=False,
@@ -223,34 +229,55 @@ class EmployeeService:
             db.add(user)
             await db.flush()
             await db.refresh(user)
+
+            # Assign user to group if poste is provided
+            group_assigned = False
+            if poste_instance and user:
+                user_group = UserGroup(
+                    user_id=user.id,
+                    group_id=poste_instance.group_id,
+                    assigned_by_id=created_by.id if created_by else None,
+                    is_active=True
+                )
+                db.add(user_group)
+                await db.flush()
+                group_assigned = True
+
+            # Refresh objects before returning
+            await db.refresh(employee)
+            await db.refresh(user)
+
+            # Send welcome email in background
+            if background_tasks:
+                user_full_name = f"{employee_data.prenom} {employee_data.nom}"
+                email_service = UserEmailService()
+                background_tasks.add_task(
+                    email_service.send_welcome_email,
+                    user_email,
+                    user_full_name,
+                    password
+                )
+
+            return {
+                "employee": employee,
+                "user": user,
+                "group_assigned": group_assigned
+            }
+
         except IntegrityError as e:
             await db.rollback()
-            raise ValueError(
-                f"Un compte utilisateur avec l'email {user_email} existe déjà"
-            ) from e
+            if "email" in str(e).lower() or "unique" in str(e).lower():
+                raise ValueError(
+                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
+                ) from e
+            raise ValueError(f"Erreur d'intégrité des données: {str(e)}") from e
+        except ValueError:
+            await db.rollback()
+            raise
+        except Exception as e:
+            await db.rollback()
+            raise ValueError(f"Erreur lors de la création de l'employé: {str(e)}") from e
 
-        # Assign user to group if poste is provided
-        group_assigned = False
-        if poste_instance and user:
-            user_group = UserGroup(
-                user_id=user.id,
-                group_id=poste_instance.group_id,
-                assigned_by_id=created_by.id if created_by else None,
-                is_active=True
-            )
-            db.add(user_group)
-            await db.flush()
-            group_assigned = True
-
-        # Refresh objects before returning
-        await db.refresh(employee)
-        await db.refresh(user)
-
-        return {
-            "employee": employee,
-            "user": user,
-            "group_assigned": group_assigned
-        }
 
     @staticmethod
     async def create_complete_employee(
@@ -258,7 +285,9 @@ class EmployeeService:
         employee_data: EmployeCreate,
         contract_data: ContratCreate,
         documents_data: List[Tuple[DocumentMetadata, Any]],
-        created_by: Optional[User] = None
+        password: str = "12345678",
+        created_by: Optional[User] = None,
+        background_tasks: Optional[BackgroundTasks] = None
     ) -> Dict[str, Any]:
         """
         Create complete employee with contract, documents, user account,
@@ -270,69 +299,68 @@ class EmployeeService:
             contract_data: Contract creation data
             documents_data: List of (metadata, file) tuples
             password: User password
-            group_id: Optional single group ID to assign user to
             created_by: User creating the employee
+            background_tasks: FastAPI background tasks for email sending
 
         Returns:
-            Dictionary with employee, contract, documents, user, group_assigned, and service_group_created
+            Dictionary with employee, contract, documents, user, group_assigned
 
         Raises:
             ValueError: If validation fails
         """
-        # 1. Validate group if provided
-
-        poste_instance = None
-        if employee_data.poste_id:
-            result = await db.execute(
-                select(ServiceGroup).where(
-                    ServiceGroup.id == employee_data.poste_id
-                )
-            )
-            poste_instance = result.scalar_one_or_none()
-            if not poste_instance:
-                raise ValueError(
-                    f"Poste avec l'ID {employee_data.poste_id} introuvable"
-                )
-
-        # 2. Create employee
-        employee = await EmployeeService.create_employee(db, employee_data)
-
-        # 3. Create contract
-        contract_dict = contract_data.model_dump()
-        contract_dict['employe_id'] = employee.id
-        contract = Contrat(**contract_dict)
-        db.add(contract)
-        await db.flush()
-        await db.refresh(contract)
-
-        # 4. Create documents
-        created_documents = []
-        for doc_metadata, doc_file in documents_data:
-            document = Document(
-                employe_id=employee.id,
-                type_document=doc_metadata.type_document,
-                titre=doc_metadata.titre,
-                description=doc_metadata.description or '',
-                fichier=doc_file,
-                expiry_date=doc_metadata.expiry_date,
-                uploaded_by=created_by.email if created_by else 'System'
-            )
-            db.add(document)
-            await db.flush()
-            await db.refresh(document)
-            created_documents.append(document)
-
-        # 5. Create user account
-        user_email = (
-            employee_data.email_professionnel or employee_data.email_personnel
-        )
-
         try:
+            # 1. Validate poste if provided
+            poste_instance = None
+            if employee_data.poste_id:
+                result = await db.execute(
+                    select(ServiceGroup).where(
+                        ServiceGroup.id == employee_data.poste_id
+                    )
+                )
+                poste_instance = result.scalar_one_or_none()
+                if not poste_instance:
+                    raise ValueError(
+                        f"Poste avec l'ID {employee_data.poste_id} introuvable"
+                    )
+
+            # 2. Create employee
+            employee = await EmployeeService.create_employee(db, employee_data)
+
+            # 3. Create contract
+            contract_dict = contract_data.model_dump()
+            contract_dict['employe_id'] = employee.id
+            contract = Contrat(**contract_dict)
+            db.add(contract)
+            await db.flush()
+            await db.refresh(contract)
+
+            # 4. Create documents
+            created_documents = []
+            for doc_metadata, doc_file in documents_data:
+                document = Document(
+                    employe_id=employee.id,
+                    type_document=doc_metadata.type_document,
+                    titre=doc_metadata.titre,
+                    description=doc_metadata.description or '',
+                    fichier=doc_file,
+                    expiry_date=doc_metadata.expiry_date,
+                    uploaded_by=created_by.email if created_by else 'System'
+                )
+                db.add(document)
+                await db.flush()
+                await db.refresh(document)
+                created_documents.append(document)
+
+            # 5. Create user account
+            user_email = (
+                employee_data.email_professionnel or employee_data.email_personnel
+            )
+
             user = User(
                 email=user_email,
                 nom=employee_data.nom,
                 prenom=employee_data.prenom,
-                password=get_password_hash("12345678"),
+                password=get_password_hash(password),
                 employe_id=employee.id,
                 is_active=True,
                 is_staff=False,
@@ -341,32 +369,52 @@ class EmployeeService:
             db.add(user)
             await db.flush()
             await db.refresh(user)
+
+            # 6. Assign user to group if provided
+            group_assigned = False
+            if poste_instance and user:
+                user_group = UserGroup(
+                    user_id=user.id,
+                    group_id=poste_instance.group_id,
+                    assigned_by_id=created_by.id if created_by else None,
+                    is_active=True
+                )
+                db.add(user_group)
+                await db.flush()
+                group_assigned = True
+
+            # 7. Send welcome email in background
+            if background_tasks:
+                user_full_name = f"{employee_data.prenom} {employee_data.nom}"
+                email_service = UserEmailService()
+                background_tasks.add_task(
+                    email_service.send_welcome_email,
+                    user_email,
+                    user_full_name,
+                    password
+                )
+
+            return {
+                "employee": employee,
+                "contract": contract,
+                "documents": created_documents,
+                "user": user,
+                "group_assigned": group_assigned,
+            }
+
         except IntegrityError as e:
             await db.rollback()
-            raise ValueError(
-                f"Un compte utilisateur avec l'email {user_email} existe déjà"
-            ) from e
-
-        # 6. Assign user to group if provided
-        group_assigned = False
-        if poste_instance and user:
-            user_group = UserGroup(
-                user_id=user.id,
-                group_id=poste_instance.group_id,
-                assigned_by_id=created_by.id if created_by else None,
-                is_active=True
-            )
-            db.add(user_group)
-            await db.flush()
-            group_assigned = True
-
-        return {
-            "employee": employee,
-            "contract": contract,
-            "documents": created_documents,
-            "user": user,
-            "group_assigned": group_assigned,
-        }
+            if "email" in str(e).lower() or "unique" in str(e).lower():
+                raise ValueError(
+                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
+                ) from e
+            raise ValueError(f"Erreur d'intégrité des données: {str(e)}") from e
+        except ValueError:
+            await db.rollback()
+            raise
+        except Exception as e:
+            await db.rollback()
+            raise ValueError(f"Erreur lors de la création complète de l'employé: {str(e)}") from e
 
     @staticmethod
     async def get_employee_by_id(

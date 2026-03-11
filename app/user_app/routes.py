@@ -1,6 +1,6 @@
 """FastAPI routes for user_app"""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -735,6 +735,7 @@ async def create_employee(
 @employe_router.post("/with-user", response_model=schemas.EmployeCreateResponse)
 async def create_employee_with_user(
     employee: schemas.EmployeCreateWithUser,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -745,12 +746,14 @@ async def create_employee_with_user(
     1. Create employee
     2. Create user account linked to employee
     3. Optionally assign user to a group (if group_id provided)
+    4. Send welcome email with credentials
     """
     try:
         result = await EmployeeService.create_employee_with_user(
             db,
             employee,
-            created_by=current_user
+            created_by=current_user,
+            background_tasks=background_tasks
         )
         await db.commit()
         return {
@@ -771,6 +774,7 @@ async def create_employee_with_user(
 )
 async def create_complete_employee(
     request: schemas.CompleteEmployeeRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -785,6 +789,7 @@ async def create_complete_employee(
     4. Documents (if provided)
     5. User account
     6. Group assignment (if group_id provided)
+    7. Send welcome email with credentials
 
     All operations are performed in a single transaction.
     If any step fails, all changes are rolled back.
@@ -798,7 +803,9 @@ async def create_complete_employee(
                 (doc_meta, f"placeholder_{doc_meta.titre}")
                 for doc_meta in request.documents_metadata
             ],
-            created_by=current_user
+            password=request.password if hasattr(request, 'password') else "12345678",
+            created_by=current_user,
+            background_tasks=background_tasks
         )
         await db.commit()
 
