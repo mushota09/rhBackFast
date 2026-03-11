@@ -327,16 +327,15 @@ class EmployeeService:
         """
         try:
             # Validate user email uniqueness BEFORE any insertion
-            user_email = (
-                employee_data.email_professionnel or employee_data.email_personnel
-            )
+            user_email=employee_data.email_professionnel
+
             result = await db.execute(
                 select(User).where(User.email == user_email)
             )
             existing_user = result.scalar_one_or_none()
             if existing_user:
                 raise ValueError(
-                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
+                    f"Un compte utilisateur avec l'email professionnel {user_email} existe déjà"
                 )
 
             # 1. Validate poste if provided
