@@ -14,7 +14,7 @@ from app.core.security import (
     get_current_user
 )
 from app.user_app import schemas
-from app.user_app.models import Service, Group, User, Employe, Permission, GroupPermission, UserGroup, Contrat, Document
+from app.user_app.models import Service, Group, ServiceGroup, User, Employe, Permission, GroupPermission, UserGroup, Contrat, Document
 from app.user_app.services import EmployeeService, GroupService, PermissionService
 from app.audit_app.services import AuditService
 
