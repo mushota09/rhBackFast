@@ -208,7 +208,7 @@ class EmployeeService:
             existing_user = result.scalar_one_or_none()
             if existing_user:
                 raise ValueError(
-                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
+                    f"Un compte utilisateur avec l'email professionnel {user_email} existe déjà"
                 )
 
             # Validate poste (ServiceGroup) if provided
