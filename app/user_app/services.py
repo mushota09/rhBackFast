@@ -200,6 +200,17 @@ class EmployeeService:
             ValueError: If validation fails
         """
         try:
+            # Validate email_professionnel uniqueness BEFORE any insertion
+            if employee_data.email_professionnel:
+                result = await db.execute(
+                    select(Employe).where(
+                        Employe.email_professionnel == employee_data.email_professionnel
+                    )
+                )
+                existing_employee = result.scalar_one_or_none()
+                if existing_employee:
+                    raise ValueError("L'email professionnel est déjà utilisé")
+
             # Validate user email uniqueness BEFORE any insertion
             user_email = (
                 employee_data.email_professionnel or employee_data.email_personnel
@@ -328,6 +339,17 @@ class EmployeeService:
             ValueError: If validation fails
         """
         try:
+            # Validate email_professionnel uniqueness BEFORE any insertion
+            if employee_data.email_professionnel:
+                result = await db.execute(
+                    select(Employe).where(
+                        Employe.email_professionnel == employee_data.email_professionnel
+                    )
+                )
+                existing_employee = result.scalar_one_or_none()
+                if existing_employee:
+                    raise ValueError("L'email professionnel est déjà utilisé")
+
             # Validate user email uniqueness BEFORE any insertion
             user_email = (
                 employee_data.email_professionnel or employee_data.email_personnel
