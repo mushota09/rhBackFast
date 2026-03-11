@@ -200,6 +200,16 @@ async def create_service(
     _current_user: User = Depends(get_current_user)
 ):
     """Create a new service"""
+    # Check if code already exists
+    existing_service = await db.execute(
+        select(Service).where(Service.code == service.code)
+    )
+    if existing_service.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ce code existe déjà"
+        )
+
     db_service = Service(**service.model_dump())
     db.add(db_service)
     await db.commit()
