@@ -127,18 +127,7 @@ class EmployeeService:
         Raises:
             ValueError: If validation fails
         """
-        # Validate email_professionnel uniqueness if provided
-        if employee_data.email_professionnel:
-            result = await db.execute(
-                select(Employe).where(
-                    Employe.email_professionnel == employee_data.email_professionnel
-                )
-            )
-            existing_employee = result.scalar_one_or_none()
-            if existing_employee:
-                raise ValueError("L'email professionnel est déjà utilisé")
-
-        # Validate poste_id if provided
+        
         if employee_data.poste_id:
             result = await db.execute(
                 select(ServiceGroup).where(ServiceGroup.id == employee_data.poste_id)
