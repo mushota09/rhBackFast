@@ -2267,6 +2267,7 @@ def get_user_app_router():
     main_router.include_router(auth_router)
     main_router.include_router(service_router)
     main_router.include_router(service_group_router)
+    main_router.include_router(poste_router)
     main_router.include_router(group_router)
     main_router.include_router(employe_router)
     main_router.include_router(permission_router)
@@ -2276,4 +2277,395 @@ def get_user_app_router():
     main_router.include_router(contrat_router)
     main_router.include_router(document_router)
     return main_router
+
+
+
+# ************************************************************************
+# POSTE ROUTES (Wrapper around Group + ServiceGroup)
+# ************************************************************************
+
+poste_router = APIRouter(prefix="/postes", tags=["Postes"])
+
+
+@poste_router.get("/")
+async def list_postes(
+    service_id: Optional[int] = Query(None),
+    skip: int = 0,
+    limit: int = 100,
+    no_pagination: bool = Query(False),
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all postes (ServiceGroups with their associated Groups)
+    
+    A poste is a position/role that combines:
+    - A Group (for RBAC)
+    - A ServiceGroup (linking the group to a service)
+    """
+    from app.core.query_utils import parse_expand_param, apply_expansion
+    from app.user_app.models import ServiceGroup
+
+    query = select(ServiceGroup)
+
+    # Apply filters
+    if service_id is not None:
+        query = query.where(ServiceGroup.service_id == service_id)
+
+    # Get total count
+    count_query = select(func.count()).select_from(ServiceGroup)
+    if service_id is not None:
+        count_query = count_query.where(ServiceGroup.service_id == service_id)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Apply expansion (always expand group and service for poste view)
+    expand_fields = ['group', 'service']
+    if expand:
+        expand_fields.extend(parse_expand_param(expand))
+    query = apply_expansion(query, ServiceGroup, expand_fields)
+
+    # Apply pagination if requested
+    if not no_pagination:
+        query = query.offset(skip).limit(limit)
+
+    result = await db.execute(query)
+    service_groups = result.scalars().all()
+
+    # Transform to Poste format
+    postes = []
+    for sg in service_groups:
+        poste_data = {
+            "id": sg.id,
+            "code": sg.group.code if sg.group else "",
+            "titre": sg.group.name if sg.group else "",
+            "description": sg.group.description if sg.group else None,
+            "service_id": sg.service_id,
+            "group_id": sg.group_id,
+            "service": sg.service,
+            "created_at": sg.created_at,
+            "updated_at": sg.updated_at
+        }
+        postes.append(poste_data)
+
+    if not no_pagination:
+        return {
+            "results": postes,
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    else:
+        return {
+            "results": postes,
+            "total": total
+        }
+
+
+@poste_router.post("/", response_model=schemas.PosteResponse, status_code=status.HTTP_201_CREATED)
+async def create_poste(
+    poste: schemas.PosteCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a new poste (creates Group + ServiceGroup)
+    
+    This endpoint:
+    1. Creates a Group with the provided code, titre (name), and description
+    2. Creates a ServiceGroup linking the new group to the specified service
+    3. Returns the combined poste information
+    """
+    try:
+        # Validate service exists
+        result = await db.execute(
+            select(Service).where(Service.id == poste.service_id)
+        )
+        service = result.scalar_one_or_none()
+        if not service:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Service with ID {poste.service_id} not found"
+            )
+
+        # Check if group with same code already exists
+        result = await db.execute(
+            select(Group).where(func.upper(Group.code) == poste.code.upper())
+        )
+        if result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=400,
+                detail=f"A group with code '{poste.code}' already exists"
+            )
+
+        # Create the group
+        group = Group(
+            code=poste.code,
+            name=poste.titre,
+            description=poste.description,
+            is_active=True
+        )
+        db.add(group)
+        await db.flush()
+        await db.refresh(group)
+
+        # Create the service group association
+        service_group = ServiceGroup(
+            service_id=poste.service_id,
+            group_id=group.id
+        )
+        db.add(service_group)
+        await db.flush()
+        await db.refresh(service_group)
+
+        # Load relationships for response
+        await db.refresh(service_group, ['service', 'group'])
+
+        await db.commit()
+
+        # Return poste format
+        return schemas.PosteResponse(
+            id=service_group.id,
+            code=group.code,
+            titre=group.name,
+            description=group.description,
+            service_id=service_group.service_id,
+            group_id=group.id,
+            service=service,
+            created_at=service_group.created_at,
+            updated_at=service_group.updated_at
+        )
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create poste: {str(e)}"
+        ) from e
+
+
+@poste_router.get("/{poste_id}", response_model=schemas.PosteResponse)
+async def get_poste(
+    poste_id: int,
+    expand: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get poste by ID (ServiceGroup ID)"""
+    from app.core.query_utils import parse_expand_param, apply_expansion
+    from app.user_app.models import ServiceGroup
+
+    query = select(ServiceGroup).where(ServiceGroup.id == poste_id)
+
+    # Always expand group and service
+    expand_fields = ['group', 'service']
+    if expand:
+        expand_fields.extend(parse_expand_param(expand))
+    query = apply_expansion(query, ServiceGroup, expand_fields)
+
+    result = await db.execute(query)
+    service_group = result.scalar_one_or_none()
+    
+    if not service_group:
+        raise HTTPException(status_code=404, detail="Poste not found")
+
+    # Return poste format
+    return schemas.PosteResponse(
+        id=service_group.id,
+        code=service_group.group.code if service_group.group else "",
+        titre=service_group.group.name if service_group.group else "",
+        description=service_group.group.description if service_group.group else None,
+        service_id=service_group.service_id,
+        group_id=service_group.group_id,
+        service=service_group.service,
+        created_at=service_group.created_at,
+        updated_at=service_group.updated_at
+    )
+
+
+@poste_router.put("/{poste_id}", response_model=schemas.PosteResponse)
+async def update_poste(
+    poste_id: int,
+    poste_update: schemas.PosteUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update poste (updates Group and optionally ServiceGroup)
+    
+    This endpoint:
+    1. Updates the associated Group's code, name (titre), and description
+    2. If service_id is provided, updates the ServiceGroup's service_id
+    """
+    from app.user_app.models import ServiceGroup
+
+    try:
+        # Get the service group
+        result = await db.execute(
+            select(ServiceGroup)
+            .options(selectinload(ServiceGroup.group), selectinload(ServiceGroup.service))
+            .where(ServiceGroup.id == poste_id)
+        )
+        service_group = result.scalar_one_or_none()
+        
+        if not service_group:
+            raise HTTPException(status_code=404, detail="Poste not found")
+
+        # Update the group
+        group = service_group.group
+        if not group:
+            raise HTTPException(status_code=404, detail="Associated group not found")
+
+        update_data = poste_update.model_dump(exclude_unset=True)
+        
+        # Update group fields
+        if 'code' in update_data:
+            # Check if new code conflicts with existing groups
+            result = await db.execute(
+                select(Group).where(
+                    func.upper(Group.code) == update_data['code'].upper(),
+                    Group.id != group.id
+                )
+            )
+            if result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"A group with code '{update_data['code']}' already exists"
+                )
+            group.code = update_data['code']
+        
+        if 'titre' in update_data:
+            group.name = update_data['titre']
+        
+        if 'description' in update_data:
+            group.description = update_data['description']
+
+        # Update service_id if provided
+        if 'service_id' in update_data:
+            # Validate new service exists
+            result = await db.execute(
+                select(Service).where(Service.id == update_data['service_id'])
+            )
+            if not result.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Service with ID {update_data['service_id']} not found"
+                )
+            service_group.service_id = update_data['service_id']
+
+        await db.commit()
+        await db.refresh(service_group)
+        await db.refresh(group)
+
+        # Reload relationships
+        await db.refresh(service_group, ['service', 'group'])
+
+        # Return poste format
+        return schemas.PosteResponse(
+            id=service_group.id,
+            code=group.code,
+            titre=group.name,
+            description=group.description,
+            service_id=service_group.service_id,
+            group_id=group.id,
+            service=service_group.service,
+            created_at=service_group.created_at,
+            updated_at=service_group.updated_at
+        )
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update poste: {str(e)}"
+        ) from e
+
+
+@poste_router.delete("/{poste_id}")
+async def delete_poste(
+    poste_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete poste (deletes ServiceGroup and associated Group)
+    
+    This endpoint:
+    1. Deletes the ServiceGroup
+    2. Deletes the associated Group (if no other ServiceGroups reference it)
+    
+    Note: The Group deletion will cascade to delete UserGroups and GroupPermissions
+    """
+    from app.user_app.models import ServiceGroup
+
+    try:
+        # Get the service group with its group
+        result = await db.execute(
+            select(ServiceGroup)
+            .options(selectinload(ServiceGroup.group))
+            .where(ServiceGroup.id == poste_id)
+        )
+        service_group = result.scalar_one_or_none()
+        
+        if not service_group:
+            raise HTTPException(status_code=404, detail="Poste not found")
+
+        group = service_group.group
+        group_id = service_group.group_id
+
+        # Delete the service group first
+        await db.delete(service_group)
+        await db.flush()
+
+        # Check if the group is still referenced by other service groups
+        result = await db.execute(
+            select(func.count(ServiceGroup.id))
+            .where(ServiceGroup.group_id == group_id)
+        )
+        other_service_groups_count = result.scalar() or 0
+
+        # If no other service groups reference this group, delete it
+        if other_service_groups_count == 0 and group:
+            # Check if group has active users
+            result = await db.execute(
+                select(func.count(UserGroup.id))
+                .where(
+                    UserGroup.group_id == group_id,
+                    UserGroup.is_active == True
+                )
+            )
+            active_users_count = result.scalar() or 0
+
+            if active_users_count > 0:
+                await db.rollback()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot delete poste. The associated group has {active_users_count} active user(s)"
+                )
+
+            # Delete the group (will cascade to UserGroups and GroupPermissions)
+            await db.delete(group)
+
+        await db.commit()
+
+        return {
+            "message": "Poste deleted successfully",
+            "group_deleted": other_service_groups_count == 0
+        }
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete poste: {str(e)}"
+        ) from e
+
 

@@ -653,3 +653,73 @@ class BulkOperationResponse(BaseModel):
     errors: List[str] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ************************************************************************
+# SERVICE GROUP SCHEMAS
+# ************************************************************************
+
+class ServiceGroupBase(BaseModel):
+    """Base service group schema"""
+    service_id: int
+    group_id: int
+
+
+class ServiceGroupCreate(ServiceGroupBase):
+    """Schema for creating a service group"""
+    pass
+
+
+class ServiceGroupUpdate(BaseModel):
+    """Schema for updating a service group"""
+    service_id: Optional[int] = None
+    group_id: Optional[int] = None
+
+
+class ServiceGroupResponse(ServiceGroupBase):
+    """Service group response schema"""
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ************************************************************************
+# POSTE SCHEMAS (Wrapper around Group + ServiceGroup)
+# ************************************************************************
+
+class PosteBase(BaseModel):
+    """Base poste schema - represents a position/role in a service"""
+    code: str = Field(..., max_length=50, description="Unique code for the position")
+    titre: str = Field(..., max_length=255, description="Position title")
+    description: Optional[str] = Field(None, description="Position description")
+    service_id: int = Field(..., description="Service ID this position belongs to")
+
+
+class PosteCreate(PosteBase):
+    """Schema for creating a poste (creates Group + ServiceGroup)"""
+    pass
+
+
+class PosteUpdate(BaseModel):
+    """Schema for updating a poste"""
+    code: Optional[str] = Field(None, max_length=50)
+    titre: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+    service_id: Optional[int] = None
+
+
+class PosteResponse(BaseModel):
+    """Poste response schema"""
+    id: int  # This is the service_group.id
+    code: str
+    titre: str
+    description: Optional[str]
+    service_id: int
+    group_id: int  # The underlying group ID
+    service: Optional[ServiceResponse] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
