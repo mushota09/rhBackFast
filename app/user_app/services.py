@@ -183,24 +183,23 @@ class EmployeeService:
         Raises:
             ValueError: If validation fails
         """
-        # Validate group if provided
-        group_instance = None
-        if employee_data.group_id:
+        # Validate poste (ServiceGroup) if provided
+        poste_instance = None
+        if employee_data.poste_id:
             result = await db.execute(
-                select(Group).where(
-                    Group.id == employee_data.group_id,
-                    Group.is_active == True
+                select(ServiceGroup).where(
+                    ServiceGroup.id == employee_data.poste_id
                 )
             )
-            group_instance = result.scalar_one_or_none()
-            if not group_instance:
+            poste_instance = result.scalar_one_or_none()
+            if not poste_instance:
                 raise ValueError(
-                    f"Groupe avec l'ID {employee_data.group_id} introuvable ou inactif"
+                    f"Poste avec l'ID {employee_data.poste_id} introuvable"
                 )
 
-        # Create employee (without password and group_id)
+        # Create employee (without password and poste_id)
         employee_dict = employee_data.model_dump(
-            exclude={"password", "group_id"}
+            exclude={"password"}
         )
         employee = await EmployeeService.create_employee(
             db,
@@ -215,7 +214,7 @@ class EmployeeService:
                 email=user_email,
                 nom=employee_data.nom,
                 prenom=employee_data.prenom,
-                password=get_password_hash(employee_data.password),
+                password=get_password_hash("12345678"),
                 employe_id=employee.id,
                 is_active=True,
                 is_staff=False,
@@ -230,12 +229,12 @@ class EmployeeService:
                 f"Un compte utilisateur avec l'email {user_email} existe déjà"
             ) from e
 
-        # Assign user to group if provided
+        # Assign user to group if poste is provided
         group_assigned = False
-        if group_instance and user:
+        if poste_instance and user:
             user_group = UserGroup(
                 user_id=user.id,
-                group_id=group_instance.id,
+                group_id=poste_instance.group_id,
                 assigned_by_id=created_by.id if created_by else None,
                 is_active=True
             )
@@ -259,8 +258,6 @@ class EmployeeService:
         employee_data: EmployeCreate,
         contract_data: ContratCreate,
         documents_data: List[Tuple[DocumentMetadata, Any]],
-        password: str,
-        group_id: Optional[int] = None,
         created_by: Optional[User] = None
     ) -> Dict[str, Any]:
         """
@@ -283,53 +280,24 @@ class EmployeeService:
             ValueError: If validation fails
         """
         # 1. Validate group if provided
-        group_instance = None
-        if group_id:
+
+        poste_instance = None
+        if employee_data.poste_id:
             result = await db.execute(
-                select(Group).where(
-                    Group.id == group_id,
-                    Group.is_active == True
+                select(ServiceGroup).where(
+                    ServiceGroup.id == employee_data.poste_id
                 )
             )
-            group_instance = result.scalar_one_or_none()
-            if not group_instance:
+            poste_instance = result.scalar_one_or_none()
+            if not poste_instance:
                 raise ValueError(
-                    f"Groupe avec l'ID {group_id} introuvable ou inactif"
+                    f"Poste avec l'ID {employee_data.poste_id} introuvable"
                 )
 
         # 2. Create employee
         employee = await EmployeeService.create_employee(db, employee_data)
 
-        # 3. Create ServiceGroup if employee has a poste_id
-        service_group_created = False
-        if employee.poste_id and group_instance:
-            # Get the ServiceGroup (poste)
-            result = await db.execute(
-                select(ServiceGroup).where(ServiceGroup.id == employee.poste_id)
-            )
-            poste = result.scalar_one_or_none()
-
-            if poste:
-                # Check if ServiceGroup association already exists
-                result = await db.execute(
-                    select(ServiceGroup).where(
-                        ServiceGroup.service_id == poste.service_id,
-                        ServiceGroup.group_id == group_instance.id
-                    )
-                )
-                existing_sg = result.scalar_one_or_none()
-
-                if not existing_sg:
-                    # Create new ServiceGroup association
-                    new_service_group = ServiceGroup(
-                        service_id=poste.service_id,
-                        group_id=group_instance.id
-                    )
-                    db.add(new_service_group)
-                    await db.flush()
-                    service_group_created = True
-
-        # 4. Create contract
+        # 3. Create contract
         contract_dict = contract_data.model_dump()
         contract_dict['employe_id'] = employee.id
         contract = Contrat(**contract_dict)
@@ -337,7 +305,7 @@ class EmployeeService:
         await db.flush()
         await db.refresh(contract)
 
-        # 5. Create documents
+        # 4. Create documents
         created_documents = []
         for doc_metadata, doc_file in documents_data:
             document = Document(
@@ -354,7 +322,7 @@ class EmployeeService:
             await db.refresh(document)
             created_documents.append(document)
 
-        # 6. Create user account
+        # 5. Create user account
         user_email = (
             employee_data.email_professionnel or employee_data.email_personnel
         )
@@ -364,7 +332,7 @@ class EmployeeService:
                 email=user_email,
                 nom=employee_data.nom,
                 prenom=employee_data.prenom,
-                password=get_password_hash(password),
+                password=get_password_hash("12345678"),
                 employe_id=employee.id,
                 is_active=True,
                 is_staff=False,
@@ -379,12 +347,12 @@ class EmployeeService:
                 f"Un compte utilisateur avec l'email {user_email} existe déjà"
             ) from e
 
-        # 7. Assign user to group if provided
+        # 6. Assign user to group if provided
         group_assigned = False
-        if group_instance and user:
+        if poste_instance and user:
             user_group = UserGroup(
                 user_id=user.id,
-                group_id=group_instance.id,
+                group_id=poste_instance.group_id,
                 assigned_by_id=created_by.id if created_by else None,
                 is_active=True
             )
@@ -398,7 +366,6 @@ class EmployeeService:
             "documents": created_documents,
             "user": user,
             "group_assigned": group_assigned,
-            "service_group_created": service_group_created
         }
 
     @staticmethod

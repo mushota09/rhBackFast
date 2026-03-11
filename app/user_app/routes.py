@@ -798,8 +798,6 @@ async def create_complete_employee(
                 (doc_meta, f"placeholder_{doc_meta.titre}")
                 for doc_meta in request.documents_metadata
             ],
-            password=request.password,
-            group_id=request.group_id,
             created_by=current_user
         )
         await db.commit()
@@ -813,7 +811,6 @@ async def create_complete_employee(
                 "contract_id": result["contract"].id,
                 "documents_count": len(result["documents"]),
                 "group_assigned": result["group_assigned"],
-                "service_group_created": result["service_group_created"]
             }
         }
     except ValueError as e:
@@ -2299,7 +2296,7 @@ async def list_postes(
 ):
     """
     List all postes (ServiceGroups with their associated Groups)
-    
+
     A poste is a position/role that combines:
     - A Group (for RBAC)
     - A ServiceGroup (linking the group to a service)
@@ -2371,7 +2368,7 @@ async def create_poste(
 ):
     """
     Create a new poste (creates Group + ServiceGroup)
-    
+
     This endpoint:
     1. Creates a Group with the provided code, titre (name), and description
     2. Creates a ServiceGroup linking the new group to the specified service
@@ -2468,7 +2465,7 @@ async def get_poste(
 
     result = await db.execute(query)
     service_group = result.scalar_one_or_none()
-    
+
     if not service_group:
         raise HTTPException(status_code=404, detail="Poste not found")
 
@@ -2495,7 +2492,7 @@ async def update_poste(
 ):
     """
     Update poste (updates Group and optionally ServiceGroup)
-    
+
     This endpoint:
     1. Updates the associated Group's code, name (titre), and description
     2. If service_id is provided, updates the ServiceGroup's service_id
@@ -2510,7 +2507,7 @@ async def update_poste(
             .where(ServiceGroup.id == poste_id)
         )
         service_group = result.scalar_one_or_none()
-        
+
         if not service_group:
             raise HTTPException(status_code=404, detail="Poste not found")
 
@@ -2520,7 +2517,7 @@ async def update_poste(
             raise HTTPException(status_code=404, detail="Associated group not found")
 
         update_data = poste_update.model_dump(exclude_unset=True)
-        
+
         # Update group fields
         if 'code' in update_data:
             # Check if new code conflicts with existing groups
@@ -2536,10 +2533,10 @@ async def update_poste(
                     detail=f"A group with code '{update_data['code']}' already exists"
                 )
             group.code = update_data['code']
-        
+
         if 'titre' in update_data:
             group.name = update_data['titre']
-        
+
         if 'description' in update_data:
             group.description = update_data['description']
 
@@ -2595,11 +2592,11 @@ async def delete_poste(
 ):
     """
     Delete poste (deletes ServiceGroup and associated Group)
-    
+
     This endpoint:
     1. Deletes the ServiceGroup
     2. Deletes the associated Group (if no other ServiceGroups reference it)
-    
+
     Note: The Group deletion will cascade to delete UserGroups and GroupPermissions
     """
     from app.user_app.models import ServiceGroup
@@ -2612,7 +2609,7 @@ async def delete_poste(
             .where(ServiceGroup.id == poste_id)
         )
         service_group = result.scalar_one_or_none()
-        
+
         if not service_group:
             raise HTTPException(status_code=404, detail="Poste not found")
 
