@@ -97,7 +97,8 @@ async def login(
             "id": user.id,
             "email": user.email,
             "nom": user.nom,
-            "prenom": user.prenom
+            "prenom": user.prenom,
+            "is_superuser": user.is_superuser
         }
     }
 
@@ -1960,15 +1961,15 @@ async def bulk_assign_users_to_groups(
 ):
     """
     Bulk assign users to groups
-    
+
     This endpoint allows assigning multiple users to multiple groups in a single operation.
-    
+
     Parameters:
     - user_ids: List of user IDs to assign
     - group_ids: List of group IDs to assign users to
     - is_active: Whether the assignments should be active (default: True)
     - replace_existing: If True, removes existing group assignments for these users first
-    
+
     Returns:
     - BulkOperationResponse with counts of created, updated, and failed operations
     """
@@ -2075,13 +2076,13 @@ async def bulk_remove_users_from_groups(
 ):
     """
     Bulk remove users from groups
-    
+
     This endpoint allows removing multiple users from multiple groups in a single operation.
-    
+
     Parameters:
     - user_ids: List of user IDs
     - group_ids: List of group IDs to remove users from
-    
+
     Returns:
     - BulkOperationResponse with count of deleted assignments
     """
@@ -2151,14 +2152,14 @@ async def bulk_update_group_permissions(
 ):
     """
     Bulk update group permissions
-    
+
     This endpoint allows updating multiple permissions for a group in a single operation.
-    
+
     Parameters:
     - group_id: The group ID to update permissions for
     - permissions: List of permission updates with permission_id and granted status
       Example: [{"permission_id": 1, "granted": true}, {"permission_id": 2, "granted": false}]
-    
+
     Returns:
     - BulkOperationResponse with counts of created, updated, and failed operations
     """
