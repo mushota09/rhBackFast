@@ -122,9 +122,22 @@ class EmployeeService:
         Returns:
             Created employee instance
 
+
+
         Raises:
             ValueError: If validation fails
         """
+        # Validate email_professionnel uniqueness if provided
+        if employee_data.email_professionnel:
+            result = await db.execute(
+                select(Employe).where(
+                    Employe.email_professionnel == employee_data.email_professionnel
+                )
+            )
+            existing_employee = result.scalar_one_or_none()
+            if existing_employee:
+                raise ValueError("L'email professionnel est déjà utilisé")
+
         # Validate poste_id if provided
         if employee_data.poste_id:
             result = await db.execute(
@@ -157,8 +170,6 @@ class EmployeeService:
             return employee
         except IntegrityError as e:
             await db.rollback()
-            # if "email_professionnel" in str(e):
-                # raise ValueError("L'email professionnel est déjà utilisé") from e
             raise ValueError(f"Erreur lors de la création de l'employé: {str(e)}") from e
 
     async def create_employee_with_user(
@@ -189,6 +200,17 @@ class EmployeeService:
             ValueError: If validation fails
         """
         try:
+            # Validate user email uniqueness BEFORE any insertion
+            user_email = employee_data.email_professionnel
+            result = await db.execute(
+                select(User).where(User.email == user_email)
+            )
+            existing_user = result.scalar_one_or_none()
+            if existing_user:
+                raise ValueError(
+                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
+                )
+
             # Validate poste (ServiceGroup) if provided
             poste_instance = None
             if employee_data.poste_id:
@@ -213,8 +235,7 @@ class EmployeeService:
             )
 
             # Create user account
-            user_email = employee_data.email_professionnel or employee_data.email_personnel
-            password = employee_data.password
+            password = "12345678"
 
             user = User(
                 email=user_email,
@@ -266,10 +287,6 @@ class EmployeeService:
 
         except IntegrityError as e:
             await db.rollback()
-            if "email" in str(e).lower() or "unique" in str(e).lower():
-                raise ValueError(
-                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
-                ) from e
             raise ValueError(f"Erreur d'intégrité des données: {str(e)}") from e
         except ValueError:
             await db.rollback()
@@ -309,6 +326,19 @@ class EmployeeService:
             ValueError: If validation fails
         """
         try:
+            # Validate user email uniqueness BEFORE any insertion
+            user_email = (
+                employee_data.email_professionnel or employee_data.email_personnel
+            )
+            result = await db.execute(
+                select(User).where(User.email == user_email)
+            )
+            existing_user = result.scalar_one_or_none()
+            if existing_user:
+                raise ValueError(
+                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
+                )
+
             # 1. Validate poste if provided
             poste_instance = None
             if employee_data.poste_id:
@@ -352,10 +382,6 @@ class EmployeeService:
                 created_documents.append(document)
 
             # 5. Create user account
-            user_email = (
-                employee_data.email_professionnel or employee_data.email_personnel
-            )
-
             user = User(
                 email=user_email,
                 nom=employee_data.nom,
@@ -404,10 +430,6 @@ class EmployeeService:
 
         except IntegrityError as e:
             await db.rollback()
-            if "email" in str(e).lower() or "unique" in str(e).lower():
-                raise ValueError(
-                    f"Un compte utilisateur avec l'email {user_email} existe déjà"
-                ) from e
             raise ValueError(f"Erreur d'intégrité des données: {str(e)}") from e
         except ValueError:
             await db.rollback()
