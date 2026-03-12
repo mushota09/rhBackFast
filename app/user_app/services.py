@@ -127,7 +127,7 @@ class EmployeeService:
         Raises:
             ValueError: If validation fails
         """
-        
+
         if employee_data.poste_id:
             result = await db.execute(
                 select(ServiceGroup).where(ServiceGroup.id == employee_data.poste_id)
@@ -237,7 +237,7 @@ class EmployeeService:
             )
 
             # Create user account
-            password = "12345678"
+            password = employee_data.password or "12345678"
 
             user = User(
                 email=user_email,
