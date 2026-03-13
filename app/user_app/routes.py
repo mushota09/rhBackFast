@@ -1,6 +1,6 @@
 """FastAPI routes for user_app"""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -15,6 +15,7 @@ from app.core.security import (
     verify_token,
     get_current_user
 )
+from app.core.permissions import require_permission
 from app.user_app import schemas
 from app.user_app.models import Service, Group, ServiceGroup, User, Employe, Permission, GroupPermission, UserGroup, Contrat, Document
 from app.user_app.services import EmployeeService, GroupService, PermissionService
@@ -736,8 +737,9 @@ async def create_employee(
 @employe_router.post("/with-user", response_model=schemas.EmployeCreateResponse)
 async def create_employee_with_useron i(
     employee: schemas.EmployeCreateWithUser,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "CREATE"))
 ):
     """
     Create employee with user account and optional group assignment
@@ -746,12 +748,16 @@ async def create_employee_with_useron i(
     1. Create employee
     2. Create user account linked to employee
     3. Optionally assign user to a group (if group_id provided)
+    4. Send welcome email with credentials
+
+    Required permission: employe.CREATE
     """
     try:
         result = await EmployeeService.create_employee_with_user(
             db,
             employee,
-            created_by=current_user
+            created_by=current_user,
+            background_tasks=background_tasks
         )
         await db.commit()
         return {
@@ -771,14 +777,10 @@ async def create_employee_with_useron i(
     response_model=schemas.CompleteEmployeeResponse
 )
 async def create_complete_employee(
-    employee: str = Form(...),
-    contract: str = Form(...),
-    documents_metadata: str = Form(...),
-    password: str = Form(default="12345"),
-    group_id: Optional[int] = Form(None),
-    files: List[UploadFile] = File(default=[]),
+    request: schemas.CompleteEmployeeRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "CREATE"))
 ):
     """
     Create complete employee with contract, documents, user account,
@@ -799,9 +801,12 @@ async def create_complete_employee(
     4. Documents (if provided)
     5. User account
     6. Group assignment (if group_id provided)
+    7. Send welcome email with credentials
 
     All operations are performed in a single transaction.
     If any step fails, all changes are rolled back.
+
+    Required permission: employe.CREATE
     """
     try:
         # Parse JSON strings
@@ -825,12 +830,15 @@ async def create_complete_employee(
         
         result = await EmployeeService.create_complete_employee(
             db=db,
-            employee_data=employee_data,
-            contract_data=contract_data,
-            documents_data=documents_data,
-            password=password,
-            group_id=group_id,
-            created_by=current_user
+            employee_data=request.employee,
+            contract_data=request.contract,
+            documents_data=[
+                (doc_meta, f"placeholder_{doc_meta.titre}")
+                for doc_meta in request.documents_metadata
+            ],
+            password=request.password if hasattr(request, 'password') else "12345678",
+            created_by=current_user,
+            background_tasks=background_tasks
         )
         await db.commit()
 
@@ -843,7 +851,6 @@ async def create_complete_employee(
                 "contract_id": result["contract"].id,
                 "documents_count": len(result["documents"]),
                 "group_assigned": result["group_assigned"],
-                "service_group_created": result["service_group_created"]
             }
         }
     except ValueError as e:
@@ -2335,7 +2342,7 @@ async def list_postes(
 ):
     """
     List all postes (ServiceGroups with their associated Groups)
-    
+
     A poste is a position/role that combines:
     - A Group (for RBAC)
     - A ServiceGroup (linking the group to a service)
@@ -2407,7 +2414,7 @@ async def create_poste(
 ):
     """
     Create a new poste (creates Group + ServiceGroup)
-    
+
     This endpoint:
     1. Creates a Group with the provided code, titre (name), and description
     2. Creates a ServiceGroup linking the new group to the specified service
@@ -2504,7 +2511,7 @@ async def get_poste(
 
     result = await db.execute(query)
     service_group = result.scalar_one_or_none()
-    
+
     if not service_group:
         raise HTTPException(status_code=404, detail="Poste not found")
 
@@ -2531,7 +2538,7 @@ async def update_poste(
 ):
     """
     Update poste (updates Group and optionally ServiceGroup)
-    
+
     This endpoint:
     1. Updates the associated Group's code, name (titre), and description
     2. If service_id is provided, updates the ServiceGroup's service_id
@@ -2546,7 +2553,7 @@ async def update_poste(
             .where(ServiceGroup.id == poste_id)
         )
         service_group = result.scalar_one_or_none()
-        
+
         if not service_group:
             raise HTTPException(status_code=404, detail="Poste not found")
 
@@ -2556,7 +2563,7 @@ async def update_poste(
             raise HTTPException(status_code=404, detail="Associated group not found")
 
         update_data = poste_update.model_dump(exclude_unset=True)
-        
+
         # Update group fields
         if 'code' in update_data:
             # Check if new code conflicts with existing groups
@@ -2572,10 +2579,10 @@ async def update_poste(
                     detail=f"A group with code '{update_data['code']}' already exists"
                 )
             group.code = update_data['code']
-        
+
         if 'titre' in update_data:
             group.name = update_data['titre']
-        
+
         if 'description' in update_data:
             group.description = update_data['description']
 
@@ -2631,11 +2638,11 @@ async def delete_poste(
 ):
     """
     Delete poste (deletes ServiceGroup and associated Group)
-    
+
     This endpoint:
     1. Deletes the ServiceGroup
     2. Deletes the associated Group (if no other ServiceGroups reference it)
-    
+
     Note: The Group deletion will cascade to delete UserGroups and GroupPermissions
     """
     from app.user_app.models import ServiceGroup
@@ -2648,7 +2655,7 @@ async def delete_poste(
             .where(ServiceGroup.id == poste_id)
         )
         service_group = result.scalar_one_or_none()
-        
+
         if not service_group:
             raise HTTPException(status_code=404, detail="Poste not found")
 

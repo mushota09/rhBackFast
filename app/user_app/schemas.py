@@ -189,10 +189,10 @@ class EmployeResponse(EmployeBase):
 # Employee creation with user account
 class EmployeCreateWithUser(EmployeCreate):
     """Schema for creating employee with user account"""
-    password: str = Field(default="12345", min_length=5)
-    group_id: Optional[int] = Field(
-        None,
-        description="Optional group ID to assign to the user"
+    password: Optional[str] = Field(default="12345678", min_length=5)
+    poste_id: int = Field(
+        ...,
+        description="Poste ID (ServiceGroup) to assign to the user"
     )
 
 

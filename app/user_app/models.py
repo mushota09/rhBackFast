@@ -243,7 +243,7 @@ class Employe(BaseModel):
     # Contact information
     email_personnel: Mapped[str] = mapped_column(String(255))
     email_professionnel: Mapped[Optional[str]] = mapped_column(
-        String(255), unique=True, nullable=True
+        String(255), nullable=True
     )
     telephone_personnel: Mapped[str] = mapped_column(String(17))
     telephone_professionnel: Mapped[Optional[str]] = mapped_column(
