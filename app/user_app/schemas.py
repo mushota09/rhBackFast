@@ -252,10 +252,9 @@ class ContratBase(BaseModel):
     devise: str = Field(default="USD", max_length=3)
 
 
-# NOTE: ContratCreate is defined later in the file (line ~506) to avoid duplication
-# class ContratCreate(ContratBase):
-#     """Schema for creating a contract"""
-#     employe_id: Optional[int] = None
+class ContratCreate(ContratBase):
+    """Schema for creating a contract"""
+    employe_id: Optional[int] = None
 
 
 class ContratResponse(ContratBase):
@@ -301,7 +300,7 @@ class CompleteEmployeeRequest(BaseModel):
     employee: EmployeCreate
     contract: ContratCreate
     documents_metadata: List[DocumentMetadata] = []
-    password: str = Field(default="12345", min_length=5)
+    password: str = Field(default="12345678", min_length=5)
     group_id: Optional[int] = Field(
         None,
         description="Optional group ID to assign to the user"
@@ -492,22 +491,8 @@ class DocumentResponse(DocumentMetadata):
 
 
 # Contrat schemas
-class ContratBase(BaseModel):
-    """Base contract schema"""
-    type_contrat: str = Field(..., max_length=50)
-    date_debut: date
-    date_fin: Optional[date] = None
-    salaire_base: Decimal = Field(..., gt=0)
-    devise: str = Field(default="USD", max_length=3)
-    indemnite_logement: Optional[Decimal] = Field(None, ge=0)
-    indemnite_transport: Optional[Decimal] = Field(None, ge=0)
-    indemnite_fonction: Optional[Decimal] = Field(None, ge=0)
-
-
-class ContratCreate(ContratBase):
-    """Schema for creating a contract"""
-    employe_id: Optional[int] = None
-
+# NOTE: ContratBase and ContratCreate are defined earlier in the file (around line 243)
+# to be used by CompleteEmployeeRequest
 
 class ContratUpdate(BaseModel):
     """Schema for updating a contract"""
