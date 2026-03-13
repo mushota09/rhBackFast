@@ -1,9 +1,10 @@
 """FastAPI routes for user_app"""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, File, UploadFile, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+import json
 
 from app.core.database import get_db
 from app.core.security import (
@@ -733,7 +734,7 @@ async def create_employee(
 
 
 @employe_router.post("/with-user", response_model=schemas.EmployeCreateResponse)
-async def create_employee_with_user(
+async def create_employee_with_useron i(
     employee: schemas.EmployeCreateWithUser,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -770,13 +771,26 @@ async def create_employee_with_user(
     response_model=schemas.CompleteEmployeeResponse
 )
 async def create_complete_employee(
-    request: schemas.CompleteEmployeeRequest,
+    employee: str = Form(...),
+    contract: str = Form(...),
+    documents_metadata: str = Form(...),
+    password: str = Form(default="12345"),
+    group_id: Optional[int] = Form(None),
+    files: List[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Create complete employee with contract, documents, user account,
     optional group assignment, and ServiceGroup creation
+
+    This endpoint accepts FormData with:
+    - employee: JSON string with employee data
+    - contract: JSON string with contract data
+    - documents_metadata: JSON string with array of document metadata
+    - password: Optional password (default: "12345")
+    - group_id: Optional group ID
+    - files: List of uploaded files (optional)
 
     This endpoint creates:
     1. Employee record
@@ -790,16 +804,32 @@ async def create_complete_employee(
     If any step fails, all changes are rolled back.
     """
     try:
+        # Parse JSON strings
+        employee_data = schemas.EmployeCreate(**json.loads(employee))
+        contract_data = schemas.ContratCreate(**json.loads(contract))
+        documents_meta = json.loads(documents_metadata)
+        
+        # Prepare documents data with actual files
+        documents_data = []
+        for idx, doc_meta_dict in enumerate(documents_meta):
+            doc_meta = schemas.DocumentMetadata(**doc_meta_dict)
+            # Use actual file if provided, otherwise use placeholder
+            if idx < len(files) and files[idx]:
+                file_content = await files[idx].read()
+                file_path = f"uploads/documents/{files[idx].filename}"
+                # TODO: Save file to disk or cloud storage
+                # For now, just use the filename as placeholder
+                documents_data.append((doc_meta, file_path))
+            else:
+                documents_data.append((doc_meta, f"placeholder_{doc_meta.titre}"))
+        
         result = await EmployeeService.create_complete_employee(
             db=db,
-            employee_data=request.employee,
-            contract_data=request.contract,
-            documents_data=[
-                (doc_meta, f"placeholder_{doc_meta.titre}")
-                for doc_meta in request.documents_metadata
-            ],
-            password=request.password,
-            group_id=request.group_id,
+            employee_data=employee_data,
+            contract_data=contract_data,
+            documents_data=documents_data,
+            password=password,
+            group_id=group_id,
             created_by=current_user
         )
         await db.commit()
@@ -821,6 +851,12 @@ async def create_complete_employee(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
+        ) from e
+    except json.JSONDecodeError as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON format: {str(e)}"
         ) from e
 
 
