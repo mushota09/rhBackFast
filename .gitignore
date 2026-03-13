@@ -61,3 +61,6 @@ htmlcov/
 
 # FastAPI
 *.pid
+
+# Uploads
+uploads/

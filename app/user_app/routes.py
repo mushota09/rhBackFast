@@ -1,6 +1,6 @@
 """FastAPI routes for user_app"""
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, BackgroundTasks, Form, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -777,8 +777,13 @@ async def create_employee_with_useron i(
     response_model=schemas.CompleteEmployeeResponse
 )
 async def create_complete_employee(
-    request: schemas.CompleteEmployeeRequest,
-    background_tasks: BackgroundTasks,
+    employee: str = Form(...),
+    contract: str = Form(...),
+    documents_metadata: str = Form(...),
+    files: List[UploadFile] = File(default=[]),
+    password: Optional[str] = Form(default="12345678"),
+    group_id: Optional[int] = Form(default=None),
+    background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("employe", "CREATE"))
 ):
@@ -790,15 +795,15 @@ async def create_complete_employee(
     - employee: JSON string with employee data
     - contract: JSON string with contract data
     - documents_metadata: JSON string with array of document metadata
-    - password: Optional password (default: "12345")
+    - files: List of uploaded files (optional, matched by index with documents_metadata)
+    - password: Optional password (default: "12345678")
     - group_id: Optional group ID
-    - files: List of uploaded files (optional)
 
     This endpoint creates:
     1. Employee record
     2. ServiceGroup association (if employee has poste_id and group_id)
     3. Contract
-    4. Documents (if provided)
+    4. Documents (if provided with files)
     5. User account
     6. Group assignment (if group_id provided)
     7. Send welcome email with credentials
@@ -808,35 +813,62 @@ async def create_complete_employee(
 
     Required permission: employe.CREATE
     """
+    import os
+    import uuid
+    from pathlib import Path
+    
     try:
-        # Parse JSON strings
+        # Parse JSON strings from FormData
         employee_data = schemas.EmployeCreate(**json.loads(employee))
         contract_data = schemas.ContratCreate(**json.loads(contract))
         documents_meta = json.loads(documents_metadata)
         
         # Prepare documents data with actual files
         documents_data = []
+        upload_dir = Path("uploads/documents")
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
         for idx, doc_meta_dict in enumerate(documents_meta):
             doc_meta = schemas.DocumentMetadata(**doc_meta_dict)
-            # Use actual file if provided, otherwise use placeholder
-            if idx < len(files) and files[idx]:
-                file_content = await files[idx].read()
-                file_path = f"uploads/documents/{files[idx].filename}"
-                # TODO: Save file to disk or cloud storage
-                # For now, just use the filename as placeholder
-                documents_data.append((doc_meta, file_path))
+            
+            # Check if there's a corresponding file
+            if idx < len(files) and files[idx] and files[idx].filename:
+                file = files[idx]
+                
+                # Generate unique filename to avoid conflicts
+                file_extension = os.path.splitext(file.filename)[1]
+                unique_filename = f"{uuid.uuid4()}{file_extension}"
+                file_path = upload_dir / unique_filename
+                
+                # Save file to disk
+                try:
+                    file_content = await file.read()
+                    with open(file_path, "wb") as f:
+                        f.write(file_content)
+                    
+                    # Store relative path for database
+                    documents_data.append((doc_meta, str(file_path)))
+                except Exception as e:
+                    # Clean up any saved files on error
+                    for _, saved_path in documents_data:
+                        if os.path.exists(saved_path):
+                            os.remove(saved_path)
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Erreur lors de la sauvegarde du fichier: {str(e)}"
+                    )
             else:
-                documents_data.append((doc_meta, f"placeholder_{doc_meta.titre}"))
+                # No file provided for this document metadata
+                documents_data.append((doc_meta, None))
         
+        # Create complete employee
         result = await EmployeeService.create_complete_employee(
             db=db,
-            employee_data=request.employee,
-            contract_data=request.contract,
-            documents_data=[
-                (doc_meta, f"placeholder_{doc_meta.titre}")
-                for doc_meta in request.documents_metadata
-            ],
-            password=request.password if hasattr(request, 'password') else "12345678",
+            employee_data=employee_data,
+            contract_data=contract_data,
+            documents_data=documents_data,
+            password=password,
+            group_id=group_id,
             created_by=current_user,
             background_tasks=background_tasks
         )
@@ -863,7 +895,13 @@ async def create_complete_employee(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid JSON format: {str(e)}"
+            detail=f"Format JSON invalide: {str(e)}"
+        ) from e
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la création de l'employé: {str(e)}"
         ) from e
 
 
