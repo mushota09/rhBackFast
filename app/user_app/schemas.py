@@ -252,9 +252,10 @@ class ContratBase(BaseModel):
     devise: str = Field(default="USD", max_length=3)
 
 
-class ContratCreate(ContratBase):
-    """Schema for creating a contract"""
-    employe_id: Optional[int] = None
+# NOTE: ContratCreate is defined later in the file (line ~506) to avoid duplication
+# class ContratCreate(ContratBase):
+#     """Schema for creating a contract"""
+#     employe_id: Optional[int] = None
 
 
 class ContratResponse(ContratBase):
@@ -505,7 +506,7 @@ class ContratBase(BaseModel):
 
 class ContratCreate(ContratBase):
     """Schema for creating a contract"""
-    employe_id: int
+    employe_id: Optional[int] = None
 
 
 class ContratUpdate(BaseModel):
