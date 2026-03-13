@@ -735,7 +735,7 @@ async def create_employee(
 
 
 @employe_router.post("/with-user", response_model=schemas.EmployeCreateResponse)
-async def create_employee_with_useron(
+async def create_employee_with_user(
     employee: schemas.EmployeCreateWithUser,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
