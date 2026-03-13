@@ -735,7 +735,7 @@ async def create_employee(
 
 
 @employe_router.post("/with-user", response_model=schemas.EmployeCreateResponse)
-async def create_employee_with_useron i(
+async def create_employee_with_useron(
     employee: schemas.EmployeCreateWithUser,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
@@ -816,36 +816,36 @@ async def create_complete_employee(
     import os
     import uuid
     from pathlib import Path
-    
+
     try:
         # Parse JSON strings from FormData
         employee_data = schemas.EmployeCreate(**json.loads(employee))
         contract_data = schemas.ContratCreate(**json.loads(contract))
         documents_meta = json.loads(documents_metadata)
-        
+
         # Prepare documents data with actual files
         documents_data = []
         upload_dir = Path("uploads/documents")
         upload_dir.mkdir(parents=True, exist_ok=True)
-        
+
         for idx, doc_meta_dict in enumerate(documents_meta):
             doc_meta = schemas.DocumentMetadata(**doc_meta_dict)
-            
+
             # Check if there's a corresponding file
             if idx < len(files) and files[idx] and files[idx].filename:
                 file = files[idx]
-                
+
                 # Generate unique filename to avoid conflicts
                 file_extension = os.path.splitext(file.filename)[1]
                 unique_filename = f"{uuid.uuid4()}{file_extension}"
                 file_path = upload_dir / unique_filename
-                
+
                 # Save file to disk
                 try:
                     file_content = await file.read()
                     with open(file_path, "wb") as f:
                         f.write(file_content)
-                    
+
                     # Store relative path for database
                     documents_data.append((doc_meta, str(file_path)))
                 except Exception as e:
@@ -860,7 +860,7 @@ async def create_complete_employee(
             else:
                 # No file provided for this document metadata
                 documents_data.append((doc_meta, None))
-        
+
         # Create complete employee
         result = await EmployeeService.create_complete_employee(
             db=db,
