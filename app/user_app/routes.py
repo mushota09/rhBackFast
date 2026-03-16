@@ -782,7 +782,6 @@ async def create_complete_employee(
     documents_metadata: str = Form(...),
     files: List[UploadFile] = File(default=[]),
     password: Optional[str] = Form(default="12345678"),
-    group_id: Optional[int] = Form(default=None),
     background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("employe", "CREATE"))
@@ -868,7 +867,6 @@ async def create_complete_employee(
             contract_data=contract_data,
             documents_data=documents_data,
             password=password,
-            group_id=group_id,
             created_by=current_user,
             background_tasks=background_tasks
         )

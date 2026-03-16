@@ -7,7 +7,10 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 T = TypeVar('T')
 
 
-# Service schemas
+# ************************************************************************
+# SERVICE SCHEMAS
+# ************************************************************************
+
 class ServiceBase(BaseModel):
     code: str = Field(..., max_length=50)
     titre: str = Field(..., max_length=255)
@@ -34,7 +37,10 @@ class ServiceResponse(ServiceBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Group schemas
+# ************************************************************************
+# GROUP SCHEMAS
+# ************************************************************************
+
 class GroupBase(BaseModel):
     code: str = Field(..., max_length=50)
     name: str = Field(..., max_length=255)
@@ -61,7 +67,24 @@ class GroupResponse(GroupBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# User schemas
+class GroupCreateWithServices(GroupCreate):
+    """Schema for creating group with service associations"""
+    service_ids: List[int] = Field(
+        default=[],
+        description="List of service IDs to associate"
+    )
+
+
+class GroupResponseWithMeta(GroupResponse):
+    """Group response with additional metadata"""
+    service_groups_count: Optional[int] = None
+    user_groups_count: Optional[int] = None
+
+
+# ************************************************************************
+# USER SCHEMAS
+# ************************************************************************
+
 class UserBase(BaseModel):
     email: EmailStr
     nom: str = Field(..., max_length=255)
@@ -101,7 +124,10 @@ class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Login schemas
+# ************************************************************************
+# AUTH SCHEMAS
+# ************************************************************************
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -121,7 +147,10 @@ class AccessTokenResponse(BaseModel):
     access_token: str
 
 
-# Employe schemas
+# ************************************************************************
+# EMPLOYE SCHEMAS
+# ************************************************************************
+
 class EmployeBase(BaseModel):
     prenom: str = Field(..., max_length=255)
     nom: str = Field(..., max_length=255)
@@ -185,8 +214,6 @@ class EmployeResponse(EmployeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-
-# Employee creation with user account
 class EmployeCreateWithUser(EmployeCreate):
     """Schema for creating employee with user account"""
     password: Optional[str] = Field(default="12345678", min_length=5)
@@ -196,24 +223,11 @@ class EmployeCreateWithUser(EmployeCreate):
     )
 
 
-# Complete employee creation response
 class EmployeCreateResponse(BaseModel):
     """Response for employee creation with user account"""
     employee: EmployeResponse
     user: Optional[UserResponse] = None
     group_assigned: bool = False
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# Pagination and filtering schemas
-class PaginatedResponse(BaseModel, Generic[T]):
-    """Generic paginated response"""
-    results: List[T]
-    total: int
-    skip: int
-    limit: int
-    meta: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -229,17 +243,10 @@ class EmployeFilter(BaseModel):
     ordering: Optional[str] = '-id'
 
 
-class GroupFilter(BaseModel):
-    """Filter parameters for group list"""
-    is_active: Optional[bool] = None
-    search: Optional[str] = None
-    expand: Optional[str] = None
-    skip: int = 0
-    limit: int = 100
-    ordering: Optional[str] = 'code'
+# ************************************************************************
+# CONTRAT SCHEMAS
+# ************************************************************************
 
-
-# Contrat schemas
 class ContratBase(BaseModel):
     """Base contract schema"""
     type_contrat: str = Field(..., max_length=50)
@@ -257,6 +264,19 @@ class ContratCreate(ContratBase):
     employe_id: Optional[int] = None
 
 
+class ContratUpdate(BaseModel):
+    """Schema for updating a contract"""
+    type_contrat: Optional[str] = Field(None, max_length=50)
+    date_debut: Optional[date] = None
+    date_fin: Optional[date] = None
+    salaire_base: Optional[Decimal] = Field(None, gt=0)
+    indemnite_logement: Optional[Decimal] = Field(None, ge=0)
+    indemnite_transport: Optional[Decimal] = Field(None, ge=0)
+    indemnite_fonction: Optional[Decimal] = Field(None, ge=0)
+    devise: Optional[str] = Field(None, max_length=3)
+    is_active: Optional[bool] = None
+
+
 class ContratResponse(ContratBase):
     """Contract response schema"""
     id: int
@@ -268,11 +288,29 @@ class ContratResponse(ContratBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Document schemas
+# ************************************************************************
+# DOCUMENT SCHEMAS
+# ************************************************************************
+
 class DocumentMetadata(BaseModel):
     """Document metadata for upload"""
     type_document: str = Field(..., max_length=50)
     titre: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    expiry_date: Optional[date] = None
+
+
+class DocumentCreate(DocumentMetadata):
+    """Schema for creating a document"""
+    employe_id: int
+    fichier: str = Field(..., max_length=500)
+    uploaded_by: str = Field(..., max_length=255)
+
+
+class DocumentUpdate(BaseModel):
+    """Schema for updating a document"""
+    type_document: Optional[str] = Field(None, max_length=50)
+    titre: Optional[str] = Field(None, max_length=255)
     description: Optional[str] = None
     expiry_date: Optional[date] = None
 
@@ -294,7 +332,10 @@ class DocumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Complete employee creation
+# ************************************************************************
+# COMPLETE EMPLOYEE CREATION SCHEMAS
+# ************************************************************************
+
 class CompleteEmployeeRequest(BaseModel):
     """Request for complete employee creation"""
     employee: EmployeCreate
@@ -316,19 +357,10 @@ class CompleteEmployeeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# Group creation with services
-class GroupCreateWithServices(GroupCreate):
-    """Schema for creating group with service associations"""
-    service_ids: List[int] = Field(default=[], description="List of service IDs to associate")
+# ************************************************************************
+# PERMISSION SCHEMAS
+# ************************************************************************
 
-
-class GroupResponseWithMeta(GroupResponse):
-    """Group response with additional metadata"""
-    service_groups_count: Optional[int] = None
-    user_groups_count: Optional[int] = None
-
-
-# Permission schemas
 class PermissionBase(BaseModel):
     """Base permission schema"""
     name: str = Field(..., max_length=255)
@@ -353,7 +385,10 @@ class PermissionResponse(PermissionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-# GroupPermission schemas
+# ************************************************************************
+# GROUP PERMISSION SCHEMAS
+# ************************************************************************
+
 class GroupPermissionBase(BaseModel):
     """Base group permission schema"""
     group_id: int
@@ -406,241 +441,6 @@ class UserPermissionsResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# ServiceGroup schemas
-class ServiceGroupBase(BaseModel):
-    """Base service group schema"""
-    service_id: int
-    group_id: int
-
-
-class ServiceGroupCreate(ServiceGroupBase):
-    """Schema for creating a service group"""
-    pass
-
-
-class ServiceGroupUpdate(BaseModel):
-    """Schema for updating a service group"""
-    service_id: Optional[int] = None
-    group_id: Optional[int] = None
-
-
-class ServiceGroupResponse(ServiceGroupBase):
-    """Service group response schema"""
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# UserGroup schemas
-class UserGroupBase(BaseModel):
-    """Base user group schema"""
-    user_id: int
-    group_id: int
-    is_active: bool = True
-
-
-class UserGroupCreate(UserGroupBase):
-    """Schema for creating a user group"""
-    assigned_by_id: Optional[int] = None
-
-
-class UserGroupUpdate(BaseModel):
-    """Schema for updating a user group"""
-    is_active: Optional[bool] = None
-
-
-class UserGroupResponse(UserGroupBase):
-    """User group response schema"""
-    id: int
-    assigned_by_id: Optional[int]
-    assigned_at: datetime
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# Document create and update schemas
-class DocumentCreate(DocumentMetadata):
-    """Schema for creating a document"""
-    employe_id: int
-    fichier: str = Field(..., max_length=500)
-    uploaded_by: str = Field(..., max_length=255)
-
-
-class DocumentUpdate(BaseModel):
-    """Schema for updating a document"""
-    type_document: Optional[str] = Field(None, max_length=50)
-    titre: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    expiry_date: Optional[date] = None
-
-
-class DocumentResponse(DocumentMetadata):
-    """Document response schema"""
-    id: int
-    employe_id: int
-    fichier: str
-    uploaded_by: str
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# Contrat schemas
-# NOTE: ContratBase and ContratCreate are defined earlier in the file (around line 243)
-# to be used by CompleteEmployeeRequest
-
-class ContratUpdate(BaseModel):
-    """Schema for updating a contract"""
-    type_contrat: Optional[str] = Field(None, max_length=50)
-    date_debut: Optional[date] = None
-    date_fin: Optional[date] = None
-    salaire_base: Optional[Decimal] = Field(None, gt=0)
-    devise: Optional[str] = Field(None, max_length=3)
-    indemnite_logement: Optional[Decimal] = Field(None, ge=0)
-    indemnite_transport: Optional[Decimal] = Field(None, ge=0)
-    indemnite_fonction: Optional[Decimal] = Field(None, ge=0)
-
-
-class ContratResponse(ContratBase):
-    """Contract response schema"""
-    id: int
-    employe_id: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# ServiceGroup schemas (moved from duplicate section)
-class ServiceGroupCreate(ServiceGroupBase):
-    """Schema for creating a service group"""
-    pass
-
-
-class ServiceGroupUpdate(BaseModel):
-    """Schema for updating a service group"""
-    service_id: Optional[int] = None
-    group_id: Optional[int] = None
-
-
-class ServiceGroupResponse(ServiceGroupBase):
-    """Service group response schema"""
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# UserGroup schemas
-class UserGroupBase(BaseModel):
-    """Base user group schema"""
-    user_id: int
-    group_id: int
-    is_active: bool = True
-
-
-class UserGroupCreate(UserGroupBase):
-    """Schema for creating a user group"""
-    assigned_by_id: Optional[int] = None
-
-
-class UserGroupUpdate(BaseModel):
-    """Schema for updating a user group"""
-    is_active: Optional[bool] = None
-
-
-class UserGroupResponse(UserGroupBase):
-    """User group response schema"""
-    id: int
-    assigned_by_id: Optional[int]
-    assigned_at: datetime
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# Contrat update schema
-class ContratUpdate(BaseModel):
-    """Schemafor updating a contract"""
-    type_contrat: Optional[str] = Field(None, max_length=50)
-    date_debut: Optional[date] = None
-    date_fin: Optional[date] = None
-    salaire_base: Optional[Decimal] = Field(None, gt=0)
-    indemnite_logement: Optional[Decimal] = Field(None, ge=0)
-    indemnite_transport: Optional[Decimal] = Field(None, ge=0)
-    indemnite_fonction: Optional[Decimal] = Field(None, ge=0)
-    devise: Optional[str] = Field(None, max_length=3)
-    is_active: Optional[bool] = None
-
-
-# Document create and update schemas
-class DocumentCreate(DocumentMetadata):
-    """Schema for creating a document"""
-    employe_id: int
-    fichier: str = Field(..., max_length=500)
-    uploaded_by: str = Field(..., max_length=255)
-
-
-class DocumentUpdate(BaseModel):
-    """Schema for updating a document"""
-    type_document: Optional[str] = Field(None, max_length=50)
-    titre: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
-    expiry_date: Optional[date] = None
-
-
-
-# ************************************************************************
-# BULK OPERATION SCHEMAS
-# ************************************************************************
-
-class BulkUserGroupAssign(BaseModel):
-    """Schema for bulk assigning users to groups"""
-    user_ids: List[int] = Field(..., min_length=1, description="List of user IDs to assign")
-    group_ids: List[int] = Field(..., min_length=1, description="List of group IDs to assign to")
-    is_active: bool = Field(default=True, description="Whether the assignments should be active")
-    replace_existing: bool = Field(
-        default=False,
-        description="If True, remove existing group assignments for these users before adding new ones"
-    )
-
-
-class BulkUserGroupRemove(BaseModel):
-    """Schema for bulk removing users from groups"""
-    user_ids: List[int] = Field(..., min_length=1, description="List of user IDs")
-    group_ids: List[int] = Field(..., min_length=1, description="List of group IDs to remove from")
-
-
-class BulkGroupPermissionUpdate(BaseModel):
-    """Schema for bulk updating group permissions"""
-    permissions: List[dict] = Field(
-        ...,
-        min_length=1,
-        description="List of permission updates with permission_id and granted status"
-    )
-    # Example: [{"permission_id": 1, "granted": true}, {"permission_id": 2, "granted": false}]
-
-
-class BulkOperationResponse(BaseModel):
-    """Response for bulk operations"""
-    success: bool
-    message: str
-    created_count: int = 0
-    updated_count: int = 0
-    deleted_count: int = 0
-    failed_count: int = 0
-    errors: List[str] = []
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 # ************************************************************************
 # SERVICE GROUP SCHEMAS
 # ************************************************************************
@@ -672,15 +472,108 @@ class ServiceGroupResponse(ServiceGroupBase):
 
 
 # ************************************************************************
+# USER GROUP SCHEMAS
+# ************************************************************************
+
+class UserGroupBase(BaseModel):
+    """Base user group schema"""
+    user_id: int
+    group_id: int
+    is_active: bool = True
+
+
+class UserGroupCreate(UserGroupBase):
+    """Schema for creating a user group"""
+    assigned_by_id: Optional[int] = None
+
+
+class UserGroupUpdate(BaseModel):
+    """Schema for updating a user group"""
+    is_active: Optional[bool] = None
+
+
+class UserGroupResponse(UserGroupBase):
+    """User group response schema"""
+    id: int
+    assigned_by_id: Optional[int]
+    assigned_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ************************************************************************
+# PAGINATION SCHEMAS
+# ************************************************************************
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Generic paginated response"""
+    results: List[T]
+    total: int
+    skip: int
+    limit: int
+    meta: Optional[dict] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GroupFilter(BaseModel):
+    """Filter parameters for group list"""
+    is_active: Optional[bool] = None
+    search: Optional[str] = None
+    expand: Optional[str] = None
+    skip: int = 0
+    limit: int = 100
+    ordering: Optional[str] = 'code'
+
+
+# ************************************************************************
+# BULK OPERATION SCHEMAS
+# ************************************************************************
+
+class BulkUserGroupAssign(BaseModel):
+    """Schema for bulk assigning users to groups"""
+    user_ids: List[int] = Field(..., min_length=1)
+    group_ids: List[int] = Field(..., min_length=1)
+    is_active: bool = Field(default=True)
+    replace_existing: bool = Field(default=False)
+
+
+class BulkUserGroupRemove(BaseModel):
+    """Schema for bulk removing users from groups"""
+    user_ids: List[int] = Field(..., min_length=1)
+    group_ids: List[int] = Field(..., min_length=1)
+
+
+class BulkGroupPermissionUpdate(BaseModel):
+    """Schema for bulk updating group permissions"""
+    permissions: List[dict] = Field(..., min_length=1)
+
+
+class BulkOperationResponse(BaseModel):
+    """Response for bulk operations"""
+    success: bool
+    message: str
+    created_count: int = 0
+    updated_count: int = 0
+    deleted_count: int = 0
+    failed_count: int = 0
+    errors: List[str] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ************************************************************************
 # POSTE SCHEMAS (Wrapper around Group + ServiceGroup)
 # ************************************************************************
 
 class PosteBase(BaseModel):
     """Base poste schema - represents a position/role in a service"""
-    code: str = Field(..., max_length=50, description="Unique code for the position")
-    titre: str = Field(..., max_length=255, description="Position title")
-    description: Optional[str] = Field(None, description="Position description")
-    service_id: int = Field(..., description="Service ID this position belongs to")
+    code: str = Field(..., max_length=50)
+    titre: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    service_id: int
 
 
 class PosteCreate(PosteBase):
@@ -698,12 +591,12 @@ class PosteUpdate(BaseModel):
 
 class PosteResponse(BaseModel):
     """Poste response schema"""
-    id: int  # This is the service_group.id
+    id: int
     code: str
     titre: str
     description: Optional[str]
     service_id: int
-    group_id: int  # The underlying group ID
+    group_id: int
     service: Optional[ServiceResponse] = None
     created_at: datetime
     updated_at: datetime

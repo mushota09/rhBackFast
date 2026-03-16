@@ -128,15 +128,15 @@ class EmployeeService:
             ValueError: If validation fails
         """
 
-        if employee_data.poste_id:
-            result = await db.execute(
-                select(ServiceGroup).where(ServiceGroup.id == employee_data.poste_id)
-            )
-            poste = result.scalar_one_or_none()
-            if not poste:
-                raise ValueError(
-                    f"ServiceGroup avec l'ID {employee_data.poste_id} introuvable"
-                )
+        # if employee_data.poste_id:
+        #     result = await db.execute(
+        #         select(ServiceGroup).where(ServiceGroup.id == employee_data.poste_id)
+        #     )
+        #     poste = result.scalar_one_or_none()
+        #     if not poste:
+        #         raise ValueError(
+        #             f"ServiceGroup avec l'ID {employee_data.poste_id} introuvable"
+        #         )
 
         # Validate responsable_id if provided
         if employee_data.responsable_id:
@@ -161,6 +161,7 @@ class EmployeeService:
             await db.rollback()
             raise ValueError(f"Erreur lors de la création de l'employé: {str(e)}") from e
 
+    @staticmethod
     async def create_employee_with_user(
         db: AsyncSession,
         employee_data: EmployeCreateWithUser,
