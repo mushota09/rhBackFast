@@ -49,21 +49,23 @@ class Settings(BaseSettings):
     CONGE__MAX_DOCUMENT_SIZE_MB: int = 100
     CONGE__ALLOWED_DOCUMENT_TYPES: str = "pdf,jpg,jpeg,png"
 
-    # Supabase Storage
-    SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""
+    # SUPABASE
+
+    SUPABASE_URL: str = "https://ylyspjvzsgcekuaywuot.supabase.co"
+    SUPABASE_KEY: str = "ylyspjvzsgcekuaywuot"
     SUPABASE_BUCKET_NAME: str = "uploads"
     # Storage backend: "local" (filesystem) or "supabase"
-    STORAGE_BACKEND: str = "local"
+    STORAGE_BACKEND: str = "supabase"
 
     # Email/SMTP Configuration
-    SMTP_HOST: str = ""  # e.g., "smtp.gmail.com"
+
+    SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = ""  # e.g., "noreply@company.com"
+    SMTP_USER: str = "sammynegalbert@gmail.com"
+    SMTP_PASSWORD: str = "ofvmompziweobxsd"
+    SMTP_FROM_EMAIL: str = "sammynegalbert@gmail.com"
     SMTP_TLS: bool = True
-    NOTIFICATIONS_ENABLED: bool = False  # Enable/disable notifications
+    NOTIFICATIONS_ENABLED: bool = True
 
     # Audit System
     AUDIT_ENABLED: bool = True  # Enable/disable audit logging
