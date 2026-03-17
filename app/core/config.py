@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     CONGE__MAX_DOCUMENT_SIZE_MB: int = 100
     CONGE__ALLOWED_DOCUMENT_TYPES: str = "pdf,jpg,jpeg,png"
 
+    # Supabase Storage
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
+    SUPABASE_BUCKET_NAME: str = "uploads"
+    # Storage backend: "local" (filesystem) or "supabase"
+    STORAGE_BACKEND: str = "local"
+
     # Email/SMTP Configuration
     SMTP_HOST: str = ""  # e.g., "smtp.gmail.com"
     SMTP_PORT: int = 587

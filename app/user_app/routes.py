@@ -812,9 +812,7 @@ async def create_complete_employee(
 
     Required permission: employe.CREATE
     """
-    import os
-    import uuid
-    from pathlib import Path
+    from app.core.storage_service import storage_service
 
     try:
         # Parse JSON strings from FormData
@@ -824,8 +822,6 @@ async def create_complete_employee(
 
         # Prepare documents data with actual files
         documents_data = []
-        upload_dir = Path("uploads/documents")
-        upload_dir.mkdir(parents=True, exist_ok=True)
 
         for idx, doc_meta_dict in enumerate(documents_meta):
             doc_meta = schemas.DocumentMetadata(**doc_meta_dict)
@@ -834,28 +830,24 @@ async def create_complete_employee(
             if idx < len(files) and files[idx] and files[idx].filename:
                 file = files[idx]
 
-                # Generate unique filename to avoid conflicts
-                file_extension = os.path.splitext(file.filename)[1]
-                unique_filename = f"{uuid.uuid4()}{file_extension}"
-                file_path = upload_dir / unique_filename
-
-                # Save file to disk
                 try:
                     file_content = await file.read()
-                    with open(file_path, "wb") as f:
-                        f.write(file_content)
-
-                    # Store relative path for database
-                    documents_data.append((doc_meta, str(file_path)))
-                except Exception as e:
-                    # Clean up any saved files on error
-                    for _, saved_path in documents_data:
-                        if os.path.exists(saved_path):
-                            os.remove(saved_path)
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=f"Erreur lors de la sauvegarde du fichier: {str(e)}"
+                    # Upload via active storage backend (local or supabase)
+                    public_url = storage_service.upload_file(
+                        file_content=file_content,
+                        original_filename=file.filename,
+                        folder="documents"
                     )
+                    if not public_url:
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Erreur lors de l'upload du fichier: {file.filename}"
+                        )
+                    documents_data.append((doc_meta, public_url))
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"Erreur lors de l'upload du fichier: {str(e)}")
             else:
                 # No file provided for this document metadata
                 documents_data.append((doc_meta, None))
