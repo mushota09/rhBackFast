@@ -2,8 +2,10 @@
 FastAPI RH Management System - Main Application
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings, validate_configuration
 from app.core.startup import run_startup_tasks
@@ -62,6 +64,11 @@ app.include_router(get_paie_app_router(), prefix="/api/paie")
 app.include_router(audit_router, prefix="/api")
 app.include_router(password_reset_router)
 app.include_router(conge_router)
+
+# Serve uploaded files as static files
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/")
