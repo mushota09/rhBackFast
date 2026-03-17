@@ -110,7 +110,7 @@ class User(BaseModel):
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     date_joined: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     employe_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("rh_employe.id", ondelete="SET NULL"),
+        ForeignKey("rh_employe.id", ondelete="CASCADE"),
         nullable=True
     )
 
