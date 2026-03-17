@@ -81,7 +81,7 @@ class SupabaseStorageService:
 
         except Exception as e:
             logger.error(f"Erreur upload Supabase: {e}")
-            return None
+            raise  # re-raise pour avoir le vrai message dans la route
 
     def delete_file(self, file_url: str) -> bool:
         try:
