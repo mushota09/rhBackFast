@@ -255,8 +255,16 @@ class ContratBase(BaseModel):
     salaire_base: Decimal = Field(..., gt=0)
     indemnite_logement: Decimal = Field(default=0, ge=0)
     indemnite_transport: Decimal = Field(default=0, ge=0)
+    indemnite_deplacement: Decimal = Field(default=0, ge=0)
     indemnite_fonction: Decimal = Field(default=0, ge=0)
+    prime_fonction: Decimal = Field(default=0, ge=0)
+    autre_avantage: Decimal = Field(default=0, ge=0)
+    assurance_patronale: Decimal = Field(default=0, ge=0)
+    assurance_salariale: Decimal = Field(default=0, ge=0)
+    fpc_patronale: Decimal = Field(default=0, ge=0)
+    fpc_salariale: Decimal = Field(default=0, ge=0)
     devise: str = Field(default="USD", max_length=3)
+    is_active: bool = True
 
 
 class ContratCreate(ContratBase):
@@ -272,7 +280,14 @@ class ContratUpdate(BaseModel):
     salaire_base: Optional[Decimal] = Field(None, gt=0)
     indemnite_logement: Optional[Decimal] = Field(None, ge=0)
     indemnite_transport: Optional[Decimal] = Field(None, ge=0)
+    indemnite_deplacement: Optional[Decimal] = Field(None, ge=0)
     indemnite_fonction: Optional[Decimal] = Field(None, ge=0)
+    prime_fonction: Optional[Decimal] = Field(None, ge=0)
+    autre_avantage: Optional[Decimal] = Field(None, ge=0)
+    assurance_patronale: Optional[Decimal] = Field(None, ge=0)
+    assurance_salariale: Optional[Decimal] = Field(None, ge=0)
+    fpc_patronale: Optional[Decimal] = Field(None, ge=0)
+    fpc_salariale: Optional[Decimal] = Field(None, ge=0)
     devise: Optional[str] = Field(None, max_length=3)
     is_active: Optional[bool] = None
 
