@@ -777,12 +777,12 @@ async def create_employee_with_user(
     response_model=schemas.CompleteEmployeeResponse
 )
 async def create_complete_employee(
+    background_tasks: BackgroundTasks,
     employee: str = Form(...),
     contract: str = Form(...),
     documents_metadata: str = Form(...),
     files: List[UploadFile] = File(default=[]),
     password: Optional[str] = Form(default="12345678"),
-    background_tasks: BackgroundTasks = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("employe", "CREATE"))
 ):
