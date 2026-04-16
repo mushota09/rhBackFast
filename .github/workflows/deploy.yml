@@ -26,6 +26,6 @@ jobs:
           export PATH="/home/rapha/.local/bin:$PATH"
           cd ${{ secrets.REMOTE_PATH_PROJECT }}
           git pull origin master
-          uv sync --frozen && uv cache prune --ci
+          uv sync
           echo "${{ secrets.PASSPHRASE }}" | sudo -S systemctl restart fastapi_uv
           sleep 3
