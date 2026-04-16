@@ -33,5 +33,6 @@ jobs:
 
           uv sync
 
-          sudo systemctl restart fastapi_uv
+          echo "${{ secrets.PASSPHRASE }}" | sudo -S systemctl restart fastapi_uv
+
           sleep 3
