@@ -21,18 +21,11 @@ jobs:
         key: ${{ secrets.KEY }}
         passphrase: ${{ secrets.PASSPHRASE }}
         port: ${{ secrets.PORT }}
-
         script: |
           set -e
-
           export PATH="/home/rapha/.local/bin:$PATH"
-
           cd ${{ secrets.REMOTE_PATH_PROJECT }}
-
           git pull origin master
-
           uv sync
-
           echo "${{ secrets.PASSPHRASE }}" | sudo -S systemctl restart fastapi_uv
-
           sleep 3
