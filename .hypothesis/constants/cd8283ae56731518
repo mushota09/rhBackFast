@@ -1,4 +1,0 @@
-# file: d:\PROJETS\PYTHON_3\rhBackFast\app\paie_app\models.py
-# hypothesis_version: 6.151.6
-
-[255, 500, 'ACTIVE', 'CASCADE', 'DRAFT', 'Employe', 'EntreePaie', 'MEDIUM', 'PeriodePaie', 'SET NULL', 'alerts', 'all, delete-orphan', 'annee', 'employe_id', 'entries', 'mois', 'paie_alert', 'paie_entree', 'paie_periode', 'paie_periode.id', 'paie_retenu_salaire', 'periode_paie', 'periode_paie_id', 'retenues', 'rh_employe.id', 'uq_annee_mois', 'uq_employe_periode']

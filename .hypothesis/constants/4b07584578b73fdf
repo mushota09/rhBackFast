@@ -1,4 +1,0 @@
-# file: d:\PROJETS\PYTHON_3\rhBackFast\app\user_app\services.py
-# hypothesis_version: 6.151.6
-
-[100, 'System', 'action', 'active_groups', 'assigned_at', 'code', 'codename', 'contract', 'description', 'documents', 'email_personnel', 'email_professionnel', 'employe_id', 'employee', 'granted_by_group', 'group_assigned', 'group_count', 'group_id', 'groups', 'id', 'matricule', 'message', 'name', 'nom', 'password', 'permission_count', 'permissions', 'postnom', 'prenom', 'resource', 'telephone_personnel', 'total_groups', 'user']

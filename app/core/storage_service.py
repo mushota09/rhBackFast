@@ -119,5 +119,10 @@ def get_storage_service():
     return LocalStorageService()
 
 
-# Singleton
+def get_storage():
+    """Lazy accessor — always reads current settings"""
+    return get_storage_service()
+
+
+# Singleton — créé au démarrage avec les settings du .env
 storage_service = get_storage_service()

@@ -812,7 +812,8 @@ async def create_complete_employee(
 
     Required permission: employe.CREATE
     """
-    from app.core.storage_service import storage_service
+    from app.core.storage_service import get_storage_service
+    storage = get_storage_service()
 
     try:
         # Parse JSON strings from FormData
@@ -833,7 +834,7 @@ async def create_complete_employee(
                 try:
                     file_content = await file.read()
                     # Upload via active storage backend (local or supabase)
-                    public_url = storage_service.upload_file(
+                    public_url = storage.upload_file(
                         file_content=file_content,
                         original_filename=file.filename,
                         folder="documents"

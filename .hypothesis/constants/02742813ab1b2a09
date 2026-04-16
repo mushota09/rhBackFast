@@ -1,4 +1,0 @@
-# file: d:\PROJETS\PYTHON_3\rhBackFast\app\core\security.py
-# hypothesis_version: 6.151.6
-
-['access', 'auto', 'bcrypt', 'exp', 'refresh', 'type']

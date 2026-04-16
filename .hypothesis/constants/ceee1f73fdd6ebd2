@@ -1,4 +1,0 @@
-# file: d:\PROJETS\PYTHON_3\rhBackFast\app\audit_app\models.py
-# hypothesis_version: 6.151.6
-
-[100, 500, 'Anonymous', 'SET NULL', 'User', '_FAILED', 'action', 'audit_log', 'ck_audit_action', 'idx_audit_timestamp', 'ip_address', 'resource_type', 'timestamp', 'user_id']
