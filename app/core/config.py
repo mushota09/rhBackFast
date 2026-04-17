@@ -1,8 +1,18 @@
 """Application configuration"""
 from decimal import Decimal
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from pydantic import Field, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Known insecure / leaked placeholder values that must never be used in
+# production. Configuration validation will reject these.
+INSECURE_SECRET_KEY_VALUES = {
+    "your-secret-key-change-in-production",
+    "thfhhvjHHTTDHHDJJHDRKHLIULRNJLGXVLBH",
+    "dev-secret-key-for-development-only-change-in-production-min-32-chars",
+}
+
 
 class Settings(BaseSettings):
     """Application settings"""
@@ -10,13 +20,17 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "RH Management System"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = False
 
-    DATABASE_URL: str = (
-    "postgresql+asyncpg://neondb_owner:npg_gZ4eYlSdwr3o@ep-tiny-sound-agslibpd-pooler.c-2.eu-central-1.aws.neon.tech/rh_db?ssl=True"
-)
+    # Database: must be provided via environment variable in production.
+    # No default credentials are hardcoded to avoid leaking production secrets
+    # through source control.
+    DATABASE_URL: str = ""
 
     # Security
+    # SECRET_KEY MUST be provided via environment variable in production.
+    # The placeholder below is intentionally non-secret and is rejected by
+    # validate_configuration() when DEBUG=False.
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -38,9 +52,10 @@ class Settings(BaseSettings):
     # Set to False for testing/development without authentication
     AUTHENTICATION_ENABLED: bool = True
 
-    # Enable/disable permission checks
-    # Set to False for development to bypass permission requirements
-    PERMISSION_CHECK_ENABLED: bool = False
+    # Enable/disable permission checks.
+    # Enabled by default — it is safer to fail closed and explicitly opt out
+    # for development via environment variable than the other way round.
+    PERMISSION_CHECK_ENABLED: bool = True
 
     # Leave Management Configuration
     CONGE__DEFAULT_COUNTRY_CODE: str = "BI"
@@ -49,23 +64,23 @@ class Settings(BaseSettings):
     CONGE__MAX_DOCUMENT_SIZE_MB: int = 100
     CONGE__ALLOWED_DOCUMENT_TYPES: str = "pdf,jpg,jpeg,png"
 
-    # SUPABASE
-
-    SUPABASE_URL: str = "https://ylyspjvzsgcekuaywuot.supabase.co"
-    SUPABASE_KEY: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlseXNwanZ6c2djZWt1YXl3dW90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3NDEzMjgsImV4cCI6MjA4OTMxNzMyOH0.cBAehGPPgXvfgnLPsNsLDrybktzA8_hbqSrrsKkvApU"
+    # SUPABASE — must be provided via environment variables. No default keys
+    # are hardcoded.
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
     SUPABASE_BUCKET_NAME: str = "uploads"
     # Storage backend: "local" (filesystem) or "supabase"
-    STORAGE_BACKEND: str = "supabase"
+    STORAGE_BACKEND: str = "local"
 
-    # Email/SMTP Configuration
-
-    SMTP_HOST: str = "smtp.gmail.com"
+    # Email/SMTP Configuration — must be provided via environment variables.
+    # No default credentials are hardcoded.
+    SMTP_HOST: str = ""
     SMTP_PORT: int = 587
-    SMTP_USER: str = "sammynegalbert@gmail.com"
-    SMTP_PASSWORD: str = "ofvmompziweobxsd"
-    SMTP_FROM_EMAIL: str = "sammynegalbert@gmail.com"
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
     SMTP_TLS: bool = True
-    NOTIFICATIONS_ENABLED: bool = True
+    NOTIFICATIONS_ENABLED: bool = False
 
     # Audit System
     AUDIT_ENABLED: bool = True  # Enable/disable audit logging
@@ -115,22 +130,30 @@ def validate_configuration() -> None:
     Raises ValueError if configuration is invalid.
     """
     try:
-
-        # Additional validation for SECRET_KEY
         secret_key = settings.SECRET_KEY
 
         # In production (DEBUG=False), enforce strict SECRET_KEY validation
         if not settings.DEBUG:
-            if not secret_key or secret_key == "your-secret-key-change-in-production":
-                msg = "SECRET_KEY must be set to a secure value in production"
-                raise ValueError(msg)
+            if not secret_key or secret_key in INSECURE_SECRET_KEY_VALUES:
+                raise ValueError(
+                    "SECRET_KEY must be set to a secure value in production "
+                    "(detected an insecure placeholder or empty value)"
+                )
 
             if len(secret_key) < 32:
-                raise ValueError("SECRET_KEY must be at least 32 characters long")
+                raise ValueError(
+                    "SECRET_KEY must be at least 32 characters long"
+                )
+
+            if not settings.DATABASE_URL:
+                raise ValueError(
+                    "DATABASE_URL must be set via environment variable in "
+                    "production"
+                )
         else:
             # In development (DEBUG=True), just warn if using default key
-            if secret_key == "your-secret-key-change-in-production":
-                print("⚠️  Warning: Using default SECRET_KEY (OK for development)")
+            if secret_key in INSECURE_SECRET_KEY_VALUES:
+                print("⚠️  Warning: Using default SECRET_KEY (OK for development only)")
 
         print("✓ Configuration validation successful")
 

@@ -11,10 +11,13 @@ import ssl
 from app.core.config import settings
 
 
-# Create SSL context for asyncpg (required for Neon and other cloud databases)
+# Create SSL context for asyncpg. By default we verify the server
+# certificate and hostname (required to prevent MITM attacks). Hosted
+# databases like Neon and Supabase use valid, publicly trusted
+# certificates so no extra trust configuration is required.
 ssl_context = ssl.create_default_context()
-ssl_context.check_hostname = False
-ssl_context.verify_mode = ssl.CERT_NONE
+ssl_context.check_hostname = True
+ssl_context.verify_mode = ssl.CERT_REQUIRED
 
 # Create async engine with SSL configuration
 engine = create_async_engine(
