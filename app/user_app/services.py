@@ -1,4 +1,6 @@
 """Business logic services for user_app"""
+import secrets
+import string
 from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
@@ -19,6 +21,20 @@ from app.core.query_utils import (
     apply_search, apply_ordering, apply_expansion, parse_expand_param
 )
 from app.user_app.email_service import UserEmailService
+
+
+def _generate_initial_password(length: int = 12) -> str:
+    """Generate a cryptographically secure random initial password.
+
+    This is used when an employee is created without an explicit password.
+    Using ``secrets`` (CSPRNG) avoids the previous hardcoded ``"12345678"``
+    default which was guessable and shared across all newly created accounts.
+    """
+    # Include at least one of each character class for basic complexity.
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    # Ensure decent entropy regardless of default length.
+    length = max(length, 12)
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 
@@ -238,7 +254,9 @@ class EmployeeService:
             )
 
             # Create user account
-            password = employee_data.password or "12345678"
+            # SECURITY: previously defaulted to the guessable string
+            # "12345678" — we now generate a CSPRNG password instead.
+            password = employee_data.password or _generate_initial_password()
 
             user = User(
                 email=user_email,
@@ -305,7 +323,7 @@ class EmployeeService:
         employee_data: EmployeCreate,
         contract_data: ContratCreate,
         documents_data: List[Tuple[DocumentMetadata, Any]],
-        password: str = "12345678",
+        password: Optional[str] = None,
         created_by: Optional[User] = None,
         background_tasks: Optional[BackgroundTasks] = None
     ) -> Dict[str, Any]:

@@ -35,7 +35,20 @@ async def login(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """Authenticate user and return JWT tokens"""
+    """Authenticate user and return JWT tokens.
+
+    SECURITY: This endpoint returns a generic error for every failure
+    scenario (unknown email, wrong password, disabled account) to avoid
+    leaking which emails are registered in the system (user enumeration).
+    """
+    # Generic error message used for every authentication failure so that
+    # an attacker cannot distinguish between "no such user" and "wrong
+    # password" / "disabled account".
+    generic_auth_error = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Identifiants invalides"
+    )
+
     # Get user by email
     result = await db.execute(select(User).where(User.email == credentials.email))
     user = result.scalar_one_or_none()
@@ -48,10 +61,7 @@ async def login(
             request=request,
             success=False
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Aucun utilisateur correspondant à cette adresse email"
-        )
+        raise generic_auth_error
 
     # Verify password
     if not verify_password(credentials.password, user.password):
@@ -62,10 +72,7 @@ async def login(
             request=request,
             success=False
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Mot de passe incorrect"
-        )
+        raise generic_auth_error
 
     # Check if user is active
     if not user.is_active:
@@ -76,10 +83,7 @@ async def login(
             request=request,
             success=False
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Ce compte est désactivé"
-        )
+        raise generic_auth_error
 
     # Create tokens
     access_token = create_access_token(user.id)
@@ -782,7 +786,7 @@ async def create_complete_employee(
     contract: str = Form(...),
     documents_metadata: str = Form(...),
     files: List[UploadFile] = File(default=[]),
-    password: Optional[str] = Form(default="12345678"),
+    password: Optional[str] = Form(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("employe", "CREATE"))
 ):
