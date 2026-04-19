@@ -141,8 +141,8 @@ EMPLOYEES: list[dict[str, Any]] = [
     # --- Managers (rattachés au boss) -------------------------------------
     {
         "matricule": "EMP-002",
-        "prenom": "Raphaël",
-        "nom": "Mushotaraphael",
+        "prenom": "Benjamin",
+        "nom": "Kilolo",
         "email": "mushotaraphael09@gmail.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
@@ -156,9 +156,8 @@ EMPLOYEES: list[dict[str, Any]] = [
     },
     {
         "matricule": "EMP-003",
-        "prenom": "Raphaël",
-        "nom": "Mushotaraphael",
-        "postnom": "07",
+        "prenom": "Michel",
+        "nom": "Lubamba",
         "email": "mushotaraphael07@gmail.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
@@ -172,8 +171,8 @@ EMPLOYEES: list[dict[str, Any]] = [
     },
     {
         "matricule": "EMP-004",
-        "prenom": "Chris",
-        "nom": "Cedrick",
+        "prenom": "Chris-Cédric",
+        "nom": "Mbombo",
         "email": "chriscedrick4@gmail.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.MARIE.value,
@@ -185,7 +184,7 @@ EMPLOYEES: list[dict[str, Any]] = [
         "salaire_base": Decimal("2800000"),
         "type_contrat": TypeContrat.CDI.value,
         "nombre_enfants": 1,
-        "nom_conjoint": "Sarah Cedrick",
+        "nom_conjoint": "Sarah Mbombo",
     },
     {
         "matricule": "EMP-005",
