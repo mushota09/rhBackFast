@@ -16,8 +16,36 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.branding import (
+    COLOR_ACCENT,
+    COLOR_BORDER,
+    COLOR_ON_PRIMARY,
+    COLOR_PRIMARY,
+    COLOR_PRIMARY_600,
+    COLOR_PRIMARY_DARK,
+    COLOR_PRIMARY_SURFACE,
+    COLOR_SUCCESS,
+    COLOR_TEXT_BODY,
+    COLOR_TEXT_MUTED,
+    COMPANY_NAME,
+)
 from app.paie_app.models import EntreePaie, PeriodePaie
 from app.user_app.models import Employe
+
+
+# Centralised ReportLab colour aliases so every section of the payslip
+# pulls from the same branding tokens. Changing the palette in
+# :mod:`app.core.branding` flows to the PDF with no code change here.
+_PDF_PRIMARY = colors.HexColor(COLOR_PRIMARY)
+_PDF_PRIMARY_DARK = colors.HexColor(COLOR_PRIMARY_DARK)
+_PDF_PRIMARY_600 = colors.HexColor(COLOR_PRIMARY_600)
+_PDF_PRIMARY_SURFACE = colors.HexColor(COLOR_PRIMARY_SURFACE)
+_PDF_ACCENT = colors.HexColor(COLOR_ACCENT)
+_PDF_SUCCESS = colors.HexColor(COLOR_SUCCESS)
+_PDF_TEXT_BODY = colors.HexColor(COLOR_TEXT_BODY)
+_PDF_TEXT_MUTED = colors.HexColor(COLOR_TEXT_MUTED)
+_PDF_BORDER = colors.HexColor(COLOR_BORDER)
+_PDF_ON_PRIMARY = colors.HexColor(COLOR_ON_PRIMARY)
 
 
 class PayslipGeneratorService:
@@ -33,8 +61,8 @@ class PayslipGeneratorService:
         self.styles.add(ParagraphStyle(
             name='CompanyTitle',
             parent=self.styles['Heading1'],
-            fontSize=16,
-            textColor=colors.HexColor('#1a1a1a'),
+            fontSize=18,
+            textColor=_PDF_PRIMARY,
             spaceAfter=6,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
@@ -44,7 +72,7 @@ class PayslipGeneratorService:
             name='SectionTitle',
             parent=self.styles['Heading2'],
             fontSize=12,
-            textColor=colors.HexColor('#333333'),
+            textColor=_PDF_PRIMARY,
             spaceAfter=12,
             spaceBefore=12,
             fontName='Helvetica-Bold'
@@ -152,9 +180,10 @@ class PayslipGeneratorService:
         """Build the header section"""
         elements = []
 
-        # Company name (you can make this configurable)
+        # Company name pulled from :mod:`app.core.branding` (which in turn
+        # reads ``settings.APP_NAME``).
         company_name = Paragraph(
-            "VOTRE ENTREPRISE",
+            COMPANY_NAME.upper(),
             self.styles['CompanyTitle']
         )
         elements.append(company_name)
@@ -193,7 +222,7 @@ class PayslipGeneratorService:
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#333333')),
+            ('TEXTCOLOR', (0, 0), (0, -1), _PDF_TEXT_BODY),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
             ('ALIGN', (1, 0), (1, -1), 'LEFT'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -256,8 +285,8 @@ class PayslipGeneratorService:
         table = Table(data, colWidths=[11*cm, 5*cm])
         table.setStyle(TableStyle([
             # Header row
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4a90e2')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 0), (-1, 0), _PDF_PRIMARY),
+            ('TEXTCOLOR', (0, 0), (-1, 0), _PDF_ON_PRIMARY),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
@@ -265,14 +294,15 @@ class PayslipGeneratorService:
             # Data rows
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 1), (-1, -1), _PDF_TEXT_BODY),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             # Gross salary row (bold)
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, -1), (-1, -1), 10),
-            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, _PDF_PRIMARY),
             # Grid
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('GRID', (0, 0), (-1, -1), 0.5, _PDF_BORDER),
         ]))
 
         elements.append(table)
@@ -336,8 +366,8 @@ class PayslipGeneratorService:
         table = Table(data, colWidths=[11*cm, 5*cm])
         table.setStyle(TableStyle([
             # Header row
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#e74c3c')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 0), (-1, 0), _PDF_PRIMARY_600),
+            ('TEXTCOLOR', (0, 0), (-1, 0), _PDF_ON_PRIMARY),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
@@ -345,14 +375,15 @@ class PayslipGeneratorService:
             # Data rows
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TEXTCOLOR', (0, 1), (-1, -1), _PDF_TEXT_BODY),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             # Total row (bold)
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, -1), (-1, -1), 10),
-            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ('LINEABOVE', (0, -1), (-1, -1), 1, _PDF_PRIMARY),
             # Grid
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('GRID', (0, 0), (-1, -1), 0.5, _PDF_BORDER),
         ]))
 
         elements.append(table)
@@ -377,16 +408,17 @@ class PayslipGeneratorService:
             ('FONTNAME', (0, 0), (0, -2), 'Helvetica-Bold'),
             ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 0), (-1, -2), 10),
+            ('TEXTCOLOR', (0, 0), (-1, -2), _PDF_TEXT_BODY),
             ('ALIGN', (0, 0), (0, -1), 'LEFT'),
             ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
             ('TOPPADDING', (0, 0), (-1, -1), 8),
-            # Net salary row (highlighted)
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#27ae60')),
-            ('TEXTCOLOR', (0, -1), (-1, -1), colors.whitesmoke),
+            # Net salary row — highlighted in the brand colour.
+            ('BACKGROUND', (0, -1), (-1, -1), _PDF_PRIMARY),
+            ('TEXTCOLOR', (0, -1), (-1, -1), _PDF_ON_PRIMARY),
             ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
             ('FONTSIZE', (0, -1), (-1, -1), 12),
-            ('LINEABOVE', (0, -1), (-1, -1), 2, colors.black),
+            ('LINEABOVE', (0, -1), (-1, -1), 2, _PDF_ACCENT),
         ]))
 
         elements.append(table)
