@@ -6,6 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 
+from app.core.branding import COLOR_PRIMARY, COMPANY_NAME, apply_branding
 from app.core.config import settings
 
 
@@ -67,7 +68,8 @@ class UserEmailService:
             with open(template_path, "r", encoding="utf-8") as f:
                 template_content = f.read()
 
-            html_content = template_content.replace("{{ user_name }}", user_name)
+            html_content = apply_branding(template_content)
+            html_content = html_content.replace("{{ user_name }}", user_name)
             html_content = html_content.replace("{{ user_email }}", email)
             html_content = html_content.replace("{{ password }}", password)
             return html_content
@@ -82,12 +84,12 @@ class UserEmailService:
     def _render_plain_text(self, email: str, user_name: str, password: str) -> str:
         """Génère la version texte brut de l'email"""
         lines = [
-            "RH Management System",
+            COMPANY_NAME,
             "=" * 50,
             "",
             f"Bonjour {user_name},",
             "",
-            "Votre compte a été créé avec succès dans le système RH Management.",
+            f"Votre compte a été créé avec succès sur {COMPANY_NAME}.",
             "",
             "VOS IDENTIFIANTS DE CONNEXION",
             "-" * 30,
@@ -96,25 +98,25 @@ class UserEmailService:
             "",
             "IMPORTANT : Changez votre mot de passe à la première connexion.",
             "",
-            "© 2024 RH Management System.",
+            f"© 2024 {COMPANY_NAME}.",
         ]
         return "\n".join(lines)
 
     def _render_fallback_html(self, email: str, user_name: str, password: str) -> str:
-        """Template HTML de secours"""
+        """Template HTML de secours (utilisé si le fichier template est introuvable)."""
         return f"""<!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8"><title>Bienvenue</title></head>
-<body style="font-family:Arial,sans-serif;background-color:#F0FFFF;padding:20px;">
-  <div style="max-width:600px;margin:0 auto;background:white;padding:30px;border-radius:10px;">
-    <h2 style="color:#667eea;text-align:center;">Bienvenue !</h2>
+<head><meta charset="UTF-8"><title>Bienvenue - {COMPANY_NAME}</title></head>
+<body style="font-family:Arial,sans-serif;background-color:#F5F7F7;padding:20px;color:#102624;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;padding:32px;border-radius:12px;border:1px solid #D8DFDE;">
+    <h2 style="color:{COLOR_PRIMARY};text-align:center;margin:0 0 20px 0;">Bienvenue sur {COMPANY_NAME}</h2>
     <p>Bonjour <strong>{user_name}</strong>,</p>
     <p>Votre compte a été créé avec succès.</p>
-    <div style="background:#F0FFFF;padding:20px;border-radius:8px;border:2px solid #667eea;">
+    <div style="background:#E8F2F0;padding:20px;border-radius:8px;border:1px solid #D8DFDE;">
       <p><strong>Email :</strong> {email}</p>
-      <p><strong>Mot de passe :</strong> <code>{password}</code></p>
+      <p><strong>Mot de passe :</strong> <code style="color:{COLOR_PRIMARY};font-weight:bold;">{password}</code></p>
     </div>
-    <p style="color:#856404;background:#fff3cd;padding:10px;border-left:4px solid #ffc107;">
+    <p style="color:#78350F;background:#FEF3C7;padding:10px;border-left:4px solid #B45309;border-radius:4px;">
       Changez votre mot de passe à la première connexion.
     </p>
   </div>

@@ -7,6 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 from typing import Optional
 
+from app.core.branding import COLOR_PRIMARY, COMPANY_NAME, apply_branding
 from app.core.config import settings
 
 
@@ -110,7 +111,8 @@ class EmailService:
             # Si user_name n'est pas fourni, utiliser une salutation générique
             display_name = user_name if user_name else "Utilisateur"
 
-            html_content = template_content.replace("{{ user_name }}", display_name)
+            html_content = apply_branding(template_content)
+            html_content = html_content.replace("{{ user_name }}", display_name)
             html_content = html_content.replace("{{ otp_code }}", otp)
 
             return html_content
@@ -137,7 +139,7 @@ class EmailService:
         display_name = user_name if user_name else "Utilisateur"
 
         lines = [
-            "RH Management System",
+            COMPANY_NAME,
             "=" * 50,
             "",
             f"Bonjour {display_name},",
@@ -158,10 +160,10 @@ class EmailService:
             "système. Ne partagez jamais ce code avec qui que ce soit.",
             "",
             "=" * 50,
-            "Cet email a été envoyé automatiquement par le système",
-            "RH Management System. Merci de ne pas répondre à cet email.",
+            f"Cet email a été envoyé automatiquement par {COMPANY_NAME}.",
+            "Merci de ne pas répondre à cet email.",
             "",
-            "© 2024 RH Management System. Tous droits réservés.",
+            f"© 2024 {COMPANY_NAME}. Tous droits réservés.",
         ]
 
         return "\n".join(lines)
@@ -185,25 +187,25 @@ class EmailService:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Code de vérification</title>
+    <title>Code de vérification - {COMPANY_NAME}</title>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #28a745;">RH Management System</h2>
-   <p>Bonjour {display_name},</p>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #102624; background-color: #F5F7F7;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 24px; background:#ffffff; border-radius: 12px; border: 1px solid #D8DFDE;">
+        <h2 style="color: {COLOR_PRIMARY}; margin: 0 0 16px 0;">{COMPANY_NAME}</h2>
+        <p>Bonjour {display_name},</p>
         <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
         <p>Votre code de vérification est :</p>
-        <div style="background-color: #f8f9fa; padding: 20px; text-align: center; margin: 20px 0; border: 2px solid #28a745; border-radius: 8px;">
-            <h1 style="color: #28a745; font-size: 36px; letter-spacing: 8px; margin: 0;">{otp}</h1>
+        <div style="background-color: #E8F2F0; padding: 20px; text-align: center; margin: 20px 0; border: 1px solid #D8DFDE; border-radius: 10px;">
+            <h1 style="color: {COLOR_PRIMARY}; font-size: 36px; letter-spacing: 10px; margin: 0;">{otp}</h1>
         </div>
         <p><strong>Important :</strong> Ce code est valide pendant 15 minutes seulement.</p>
-        <div style="background-color: #f8d7da; padding: 15px; border-left: 4px solid #dc3545; margin: 20px 0;">
-            <p style="margin: 0;"><strong>🔒 Avertissement de sécurité</strong></p>
-            <p style="margin: 10px 0 0 0;">Si vous n'avez pas demandé cette réinitialisation, veuillez ignorer cet email et contacter immédiatement votre administrateur système.</p>
+        <div style="background-color: #FEE2E2; padding: 14px 16px; border-left: 4px solid #B91C1C; border-radius: 6px; margin: 20px 0;">
+            <p style="margin: 0; color: #7F1D1D;"><strong>Avertissement de sécurité</strong></p>
+            <p style="margin: 8px 0 0 0; color: #7F1D1D; font-size: 13px;">Si vous n'avez pas demandé cette réinitialisation, ignorez cet email et contactez immédiatement votre administrateur système.</p>
         </div>
-        <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
-        <p style="font-size: 12px; color: #6c757d; text-align: center;">
-            © 2024 RH Management System. Tous droits réservés.
+        <hr style="border: none; border-top: 1px solid #D8DFDE; margin: 30px 0;">
+        <p style="font-size: 12px; color: #5A6968; text-align: center;">
+            © 2024 {COMPANY_NAME}. Tous droits réservés.
         </p>
     </div>
 </body>
