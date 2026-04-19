@@ -8,7 +8,7 @@ from app.conge_app.models import (
     StatutProcessus,
 )
 from app.paie_app.init_data import init_paie_workflow_defaults
-from app.paie_app.workflow_constants import (
+from app.paie_app.constants import (
     CodeProcessusPaie,
     CodeStatutPaie,
     NomActionPaie,

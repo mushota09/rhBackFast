@@ -18,7 +18,7 @@ from app.user_app.models import Permission
 from app.conge_app.constants import PERMISSIONS as CONGE_PERMISSIONS
 from app.conge_app.init_data import init_conge_defaults
 from app.paie_app.init_data import init_paie_workflow_defaults
-from app.paie_app.workflow_constants import WORKFLOW_PERMISSIONS as PAIE_WORKFLOW_PERMISSIONS
+from app.paie_app.constants import WORKFLOW_PERMISSIONS as PAIE_WORKFLOW_PERMISSIONS
 
 
 # Audit app permissions

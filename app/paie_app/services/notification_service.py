@@ -8,6 +8,7 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.paie_app.constants import SEVERITY_COLORS
 from app.paie_app.models import Alert, PeriodePaie, EntreePaie, RetenueEmploye
 from app.user_app.models import User, Employe
 from app.core.config import settings
@@ -95,8 +96,8 @@ class NotificationService:
 
     async def _get_alert_recipients(self, alert: Alert) -> List[str]:
         """Get email recipients for an alert"""
-        recipient
-
+        recipients: List[str] = []
+        result = await self.db.execute(select(User).where(User.is_active.is_(True)))
         users = result.scalars().all()
         for user in users:
             if await self._user_has_payroll_permission(user):
@@ -133,19 +134,13 @@ class NotificationService:
 
     def _format_alert_email_html(self, alert: Alert) -> str:
         """Format alert as HTML email"""
-        severity_colors = {
-            'LOW': '#28a745',
-            'MEDIUM': '#ffc107',
-            'HIGH': '#fd7e14',
-            'CRITICAL': '#dc3545'
-        }
-        color = severity_colors.get(alert.severity, '#6c757d')
+        color = SEVERITY_COLORS.get(alert.severity, '#6c757d')
 
         html_parts = [
             '<html><body style="font-family: Arial, sans-serif;">',
             f'<div style="border-left: 4px solid {color}; padding: 15px; background-color: #f8f9fa; margin: 20px 0;">',
             f'<div style="font-size: 18px; font-weight: bold; color: {color}; margin-bottom: 10px;">{alert.title}</div>',
-            f'<div style="font-size: 12px; color: #6c757d; margin-bottom: 15px;">',
+            '<div style="font-size: 12px; color: #6c757d; margin-bottom: 15px;">',
             f'<strong>Severity:</strong> {alert.severity} | ',
             f'<strong>Type:</strong> {alert.alert_type} | ',
             f'<strong>Status:</strong> {alert.status}</div>',
@@ -347,7 +342,7 @@ class NotificationService:
 
     async def _get_hr_managers(self) -> List[str]:
         """Get email addresses of HR managers"""
-        result = await self.db.execute(select(User).where(User.is_active == True))
+        result = await self.db.execute(select(User).where(User.is_active.is_(True)))
         users = result.scalars().all()
         emails = []
         for user in users:

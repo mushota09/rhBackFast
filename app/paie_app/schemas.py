@@ -4,6 +4,8 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
 
+from app.paie_app.constants import PeriodeStatutTexte
+
 
 class AlertBase(BaseModel):
     alert_type: str = Field(..., max_length=50)
@@ -86,7 +88,7 @@ class PeriodePaieBase(BaseModel):
     mois: int = Field(..., ge=1, le=12)
     date_debut: date
     date_fin: date
-    statut: str = Field(default="DRAFT", max_length=20)
+    statut: str = Field(default=PeriodeStatutTexte.DRAFT.value, max_length=20)
 
 
 class PeriodePaieCreate(PeriodePaieBase):

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc
 from sqlalchemy.orm import selectinload
 
+from app.paie_app.constants import AlertStatus
 from app.paie_app.models import (
     PeriodePaie, EntreePaie, RetenueEmploye, Alert
 )
@@ -511,7 +512,7 @@ class StatisticsService:
             "annee": annee,
             "mois": mois,
             "periode_actuelle": None,
-            "alertes": await self.get_alerts_summary(status="ACTIVE"),
+            "alertes": await self.get_alerts_summary(status=AlertStatus.ACTIVE.value),
             "retenues_actives": await self.get_deductions_summary(),
         }
 

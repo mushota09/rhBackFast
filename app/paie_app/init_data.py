@@ -21,7 +21,7 @@ from app.conge_app.models import (
     EtapeProcessus,
     StatutProcessus,
 )
-from app.paie_app.workflow_constants import (
+from app.paie_app.constants import (
     CodeProcessusPaie,
     CodeStatutPaie,
     NomActionPaie,

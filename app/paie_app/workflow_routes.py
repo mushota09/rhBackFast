@@ -37,7 +37,7 @@ from app.paie_app.services.paie_workflow_service import (
     PaieWorkflowService,
     PaieWorkflowStateError,
 )
-from app.paie_app.workflow_constants import DemandeTypePaie
+from app.paie_app.constants import DemandeTypePaie
 from app.user_app.models import User
 
 

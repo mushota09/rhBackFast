@@ -1,58 +1,294 @@
-"""
-Constants for payroll calculations.
+"""Constantes centralisées du module paie.
 
-This module contains all the rates, caps, and scales used for payroll
-calculations including INSS contributions, income tax (IRE), and family
-allowances.
+Tous les énumérés, taux, plafonds et constantes du workflow sont regroupés
+ici pour éviter les chaînes magiques éparpillées dans le code.
+
+Trois grandes catégories :
+- **Workflow** (statuts, étapes, actions, permissions) — réutilise les tables
+  génériques du module ``conge_app``.
+- **Statuts texte rétro-compat** de ``PeriodePaie.statut`` (alertes, retenues,
+  périodes) — pour les anciens endpoints et les enregistrements existants.
+- **Paramètres de calcul** (INSS, IRE, allocations familiales).
 """
+from __future__ import annotations
+
 from decimal import Decimal
+from enum import Enum
 from typing import Dict, List
 
+# Réutilisation du statut d'attribution partagé avec conge_app.
+from app.conge_app.constants import StatutAttribution
 
-# ============================================================================
-# INSS (Institut National de Sécurité Sociale) - Social Security
-# ============================================================================
-
-# Employer contributions
-INSS_PENSION_RATE = Decimal("0.06")  # 6% for pension
-INSS_PENSION_CAP = Decimal("27000")  # Maximum 27,000 FC
-
-INSS_RISK_RATE = Decimal("0.06")  # 6% for occupational risk
-INSS_RISK_CAP = Decimal("2400")  # Maximum 2,400 FC
-
-# Employee contributions
-INSS_EMPLOYEE_RATE = Decimal("0.04")  # 4% for employee
-INSS_EMPLOYEE_CAP = Decimal("18000")  # Maximum 18,000 FC
-
-
-# ============================================================================
-# IRE (Impôt sur le Revenu des Employés) - Income Tax
-# ============================================================================
-
-IRE_BRACKETS: List[Dict] = [
-    {
-        "min": Decimal("0"),
-        "max": Decimal("150000"),
-        "rate": Decimal("0.0"),  # 0% for first bracket
-        "base_tax": Decimal("0")
-    },
-    {
-        "min": Decimal("150000"),
-        "max": Decimal("300000"),
-        "rate": Decimal("0.2"),  # 20% for second bracket
-        "base_tax": Decimal("0")
-    },
-    {
-        "min": Decimal("300000"),
-        "max": Decimal("999999999"),  # Infinity
-        "rate": Decimal("0.3"),  # 30% for third bracket
-        "base_tax": Decimal("30000")  # 150,000 * 0.2
-    }
+__all__ = [
+    # Attribution (re-export)
+    "StatutAttribution",
+    # Workflow paie
+    "CodeProcessusPaie",
+    "DemandeTypePaie",
+    "CodeStatutPaie",
+    "NomActionPaie",
+    "STATUT_TEXTUEL_PAR_CODE",
+    "WORKFLOW_PERMISSIONS",
+    # Statut texte période
+    "PeriodeStatutTexte",
+    "PERIOD_STATUS",
+    # Alertes
+    "AlertType",
+    "AlertSeverity",
+    "AlertStatus",
+    "ALERT_TYPES",
+    "ALERT_SEVERITY",
+    "ALERT_STATUS",
+    "SEVERITY_COLORS",
+    # Retenues
+    "DeductionType",
+    "DEDUCTION_TYPES",
+    # Taux de calcul
+    "INSS_PENSION_RATE",
+    "INSS_PENSION_CAP",
+    "INSS_RISK_RATE",
+    "INSS_RISK_CAP",
+    "INSS_EMPLOYEE_RATE",
+    "INSS_EMPLOYEE_CAP",
+    "IRE_BRACKETS",
+    "FAMILY_ALLOWANCE_SCALE",
+    "FAMILY_ALLOWANCE_ADDITIONAL",
+    # Utilitaires
+    "calculate_ire",
+    "calculate_family_allowance",
+    "calculate_inss_employer",
+    "calculate_inss_employee",
+    "validate_period_status_transition",
 ]
 
 
 # ============================================================================
-# Family Allowance Scale
+# Workflow paie — identifiants polymorphiques
+# ============================================================================
+
+
+class CodeProcessusPaie(str, Enum):
+    """Code de processus workflow pour la paie (``cg_etape_processus``)."""
+
+    PAIE = "PAIE"
+
+
+class DemandeTypePaie(str, Enum):
+    """Type polymorphique pour ``cg_demande_attribution`` / ``cg_historique_demande``."""
+
+    PERIODE_PAIE = "PERIODE_PAIE"
+
+
+class CodeStatutPaie(str, Enum):
+    """Statuts globaux du workflow paie (``cg_statut_processus.code_statut``)."""
+
+    EN_ATTENTE = "EN_ATTENTE"
+    EN_COURS = "EN_COURS"
+    VALIDE = "VALIDE"
+    REJETE = "REJETE"
+    ANNULE = "ANNULE"
+    EN_MODIFICATION = "EN_MODIFICATION"
+    PAYE = "PAYE"
+
+
+class NomActionPaie(str, Enum):
+    """Actions applicables sur les étapes du workflow paie."""
+
+    APPROUVER = "APPROUVER"
+    REJETER = "REJETER"
+    DEMANDER_MODIF = "DEMANDER_MODIF"
+    PRET_A_VALIDER = "PRET_A_VALIDER"
+    MARQUER_PAYE = "MARQUER_PAYE"
+
+
+# Permissions applicatives du workflow paie.
+WORKFLOW_PERMISSIONS: Dict[str, str] = {
+    "paie_workflow.submit": "Soumettre une période de paie au workflow",
+    "paie_workflow.approve": "Valider / rejeter une étape du workflow paie",
+    "paie_workflow.manage": "Gérer la configuration du workflow paie",
+}
+
+
+# ============================================================================
+# Statut texte historique de PeriodePaie.statut
+# ============================================================================
+
+
+class PeriodeStatutTexte(str, Enum):
+    """Statuts texte historiques de ``PeriodePaie.statut``.
+
+    Le workflow dynamique reste l'unique source de vérité : ce champ texte est
+    synchronisé automatiquement par :class:`PaieWorkflowService` lors des
+    transitions. Il est conservé pour la rétro-compatibilité des anciens
+    endpoints (``process``, ``finalize``, ``approve``).
+    """
+
+    DRAFT = "DRAFT"
+    PROCESSING = "PROCESSING"
+    COMPLETED = "COMPLETED"
+    FINALIZED = "FINALIZED"
+    APPROVED = "APPROVED"
+    PAID = "PAID"
+    ARCHIVED = "ARCHIVED"
+
+
+# Liste rétro-compatible (ancien export).
+PERIOD_STATUS: List[str] = [s.value for s in PeriodeStatutTexte]
+
+
+# Mapping statut workflow → statut texte rétro-compat.
+STATUT_TEXTUEL_PAR_CODE: Dict[str, str] = {
+    CodeStatutPaie.EN_ATTENTE.value: PeriodeStatutTexte.PROCESSING.value,
+    CodeStatutPaie.EN_COURS.value: PeriodeStatutTexte.PROCESSING.value,
+    CodeStatutPaie.EN_MODIFICATION.value: PeriodeStatutTexte.PROCESSING.value,
+    CodeStatutPaie.VALIDE.value: PeriodeStatutTexte.APPROVED.value,
+    CodeStatutPaie.REJETE.value: PeriodeStatutTexte.DRAFT.value,
+    CodeStatutPaie.ANNULE.value: PeriodeStatutTexte.DRAFT.value,
+    CodeStatutPaie.PAYE.value: PeriodeStatutTexte.PAID.value,
+}
+
+
+# Transitions autorisées pour l'ancien champ ``statut`` texte (conservé pour
+# rétro-compatibilité ; la vérité fonctionnelle est désormais portée par le
+# workflow dynamique).
+_ALLOWED_STATUS_TRANSITIONS: Dict[str, List[str]] = {
+    PeriodeStatutTexte.DRAFT.value: [PeriodeStatutTexte.PROCESSING.value],
+    PeriodeStatutTexte.PROCESSING.value: [
+        PeriodeStatutTexte.COMPLETED.value,
+        PeriodeStatutTexte.DRAFT.value,
+    ],
+    PeriodeStatutTexte.COMPLETED.value: [
+        PeriodeStatutTexte.FINALIZED.value,
+        PeriodeStatutTexte.PROCESSING.value,
+    ],
+    PeriodeStatutTexte.FINALIZED.value: [
+        PeriodeStatutTexte.APPROVED.value,
+        PeriodeStatutTexte.COMPLETED.value,
+    ],
+    PeriodeStatutTexte.APPROVED.value: [PeriodeStatutTexte.PAID.value],
+    PeriodeStatutTexte.PAID.value: [PeriodeStatutTexte.ARCHIVED.value],
+    PeriodeStatutTexte.ARCHIVED.value: [],
+}
+
+
+def validate_period_status_transition(current_status: str, new_status: str) -> bool:
+    """Valide qu'une transition de statut texte est autorisée."""
+    return new_status in _ALLOWED_STATUS_TRANSITIONS.get(current_status, [])
+
+
+# ============================================================================
+# Alertes
+# ============================================================================
+
+
+class AlertType(str, Enum):
+    """Types d'alertes système paie."""
+
+    MISSING_CONTRACT = "MISSING_CONTRACT"
+    NEGATIVE_SALARY = "NEGATIVE_SALARY"
+    HIGH_DEDUCTION = "HIGH_DEDUCTION"
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    CALCULATION_ERROR = "CALCULATION_ERROR"
+    MISSING_DATA = "MISSING_DATA"
+    OTHER = "OTHER"
+
+
+class AlertSeverity(str, Enum):
+    """Sévérité d'une alerte."""
+
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class AlertStatus(str, Enum):
+    """Statut d'une alerte."""
+
+    ACTIVE = "ACTIVE"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    RESOLVED = "RESOLVED"
+    DISMISSED = "DISMISSED"
+
+
+# Listes rétro-compatibles (anciens exports).
+ALERT_TYPES: List[str] = [a.value for a in AlertType]
+ALERT_SEVERITY: List[str] = [s.value for s in AlertSeverity]
+ALERT_STATUS: List[str] = [s.value for s in AlertStatus]
+
+
+# Couleurs HTML associées à la sévérité (utilisé par
+# ``services.notification_service``).
+SEVERITY_COLORS: Dict[str, str] = {
+    AlertSeverity.LOW.value: "#28a745",
+    AlertSeverity.MEDIUM.value: "#ffc107",
+    AlertSeverity.HIGH.value: "#fd7e14",
+    AlertSeverity.CRITICAL.value: "#dc3545",
+}
+
+
+# ============================================================================
+# Retenues salariales
+# ============================================================================
+
+
+class DeductionType(str, Enum):
+    """Types de retenues sur salaire."""
+
+    AVANCE_SALAIRE = "AVANCE_SALAIRE"
+    PRET = "PRET"
+    ASSURANCE = "ASSURANCE"
+    SYNDICAT = "SYNDICAT"
+    AUTRE = "AUTRE"
+
+
+DEDUCTION_TYPES: List[str] = [d.value for d in DeductionType]
+
+
+# ============================================================================
+# INSS (Institut National de Sécurité Sociale)
+# ============================================================================
+
+# Contributions patronales.
+INSS_PENSION_RATE = Decimal("0.06")  # 6 % pour la pension
+INSS_PENSION_CAP = Decimal("27000")  # Plafond 27 000 FC
+
+INSS_RISK_RATE = Decimal("0.06")  # 6 % pour les risques professionnels
+INSS_RISK_CAP = Decimal("2400")  # Plafond 2 400 FC
+
+# Contribution salariale.
+INSS_EMPLOYEE_RATE = Decimal("0.04")  # 4 % à la charge du salarié
+INSS_EMPLOYEE_CAP = Decimal("18000")  # Plafond 18 000 FC
+
+
+# ============================================================================
+# IRE (Impôt sur le Revenu des Employés)
+# ============================================================================
+
+IRE_BRACKETS: List[Dict[str, Decimal]] = [
+    {
+        "min": Decimal("0"),
+        "max": Decimal("150000"),
+        "rate": Decimal("0.0"),
+        "base_tax": Decimal("0"),
+    },
+    {
+        "min": Decimal("150000"),
+        "max": Decimal("300000"),
+        "rate": Decimal("0.2"),
+        "base_tax": Decimal("0"),
+    },
+    {
+        "min": Decimal("300000"),
+        "max": Decimal("999999999"),
+        "rate": Decimal("0.3"),
+        "base_tax": Decimal("30000"),  # 150 000 * 0.2
+    },
+]
+
+
+# ============================================================================
+# Allocations familiales
 # ============================================================================
 
 FAMILY_ALLOWANCE_SCALE: Dict[int, Decimal] = {
@@ -62,209 +298,58 @@ FAMILY_ALLOWANCE_SCALE: Dict[int, Decimal] = {
     3: Decimal("15000"),
 }
 
-# Additional amount per child beyond 3
+# Montant additionnel par enfant au-delà de 3.
 FAMILY_ALLOWANCE_ADDITIONAL = Decimal("3000")
 
 
 # ============================================================================
-# Deduction Types
+# Fonctions utilitaires de calcul
 # ============================================================================
 
-DEDUCTION_TYPES = [
-    "AVANCE_SALAIRE",  # Salary advance
-    "PRET",  # Loan
-    "ASSURANCE",  # Insurance
-    "SYNDICAT",  # Union dues
-    "AUTRE"  # Other
-]
-
-
-# ============================================================================
-# Period Status
-# ============================================================================
-
-PERIOD_STATUS = [
-    "DRAFT",  # Draft - being created
-    "PROCESSING",  # Processing - calculations in progress
-    "COMPLETED",  # Completed - calculations done
-    "FINALIZED",  # Finalized - ready for approval
-    "APPROVED",  # Approved - approved by manager
-    "PAID",  # Paid - salaries have been paid
-    "ARCHIVED"  # Archived - old period
-]
-
-
-# ============================================================================
-# Alert Types and Severity
-# ============================================================================
-
-ALERT_TYPES = [
-    "MISSING_CONTRACT",  # Employee has no active contract
-    "NEGATIVE_SALARY",  # Calculated salary is negative
-    "HIGH_DEDUCTION",  # Deductions exceed threshold
-    "VALIDATION_ERROR",  # Validation error in entry
-    "CALCULATION_ERROR",  # Error during calculation
-    "MISSING_DATA",  # Missing required data
-    "OTHER"  # Other alert type
-]
-
-ALERT_SEVERITY = [
-    "LOW",  # Low severity
-    "MEDIUM",  # Medium severity
-    "HIGH",  # High severity
-    "CRITICAL"  # Critical severity
-]
-
-ALERT_STATUS = [
-    "ACTIVE",  # Active alert
-    "ACKNOWLEDGED",  # Acknowledged by user
-    "RESOLVED",  # Resolved
-    "DISMISSED"  # Dismissed
-]
-
-
-# ============================================================================
-# Utility Functions
-# ============================================================================
 
 def calculate_ire(base_imposable: Decimal) -> Decimal:
-    """
-    Calculate income tax (IRE) using progressive tax brackets.
-
-    Args:
-        base_imposable: Taxable base amount
-
-    Returns:
-        Calculated IRE amount
+    """Calcule l'IRE par tranches progressives.
 
     Example:
         >>> calculate_ire(Decimal("100000"))
         Decimal('0')
         >>> calculate_ire(Decimal("200000"))
-        Decimal('10000')  # (200000 - 150000) * 0.2
+        Decimal('10000')
         >>> calculate_ire(Decimal("400000"))
-        Decimal('60000')  # 30000 + (400000 - 300000) * 0.3
+        Decimal('60000')
     """
     if base_imposable <= Decimal("150000"):
         return Decimal("0")
-    elif base_imposable <= Decimal("300000"):
+    if base_imposable <= Decimal("300000"):
         return (base_imposable - Decimal("150000")) * Decimal("0.2")
-    else:
-        # 30000 (for 150k-300k) + 30% of amount above 300k
-        return Decimal("30000") + (
-            (base_imposable - Decimal("300000")) * Decimal("0.3")
-        )
+    return Decimal("30000") + (base_imposable - Decimal("300000")) * Decimal("0.3")
 
 
 def calculate_family_allowance(nombre_enfants: int) -> Decimal:
-    """
-    Calculate family allowance using progressive scale.
-
-    Args:
-        nombre_enfants: Number of children
-
-    Returns:
-        Family allowance amount
-
-    Example:
-        >>> calculate_family_allowance(0)
-        Decimal('0')
-        >>> calculate_family_allowance(1)
-        Decimal('5000')
-        >>> calculate_family_allowance(3)
-        Decimal('15000')
-        >>> calculate_family_allowance(5)
-        Decimal('21000')  # 15000 + (2 * 3000)
-    """
+    """Calcule l'allocation familiale selon le barème progressif."""
     if nombre_enfants <= 0:
         return Decimal("0")
 
-    # Use scale for 0-3 children
     if nombre_enfants in FAMILY_ALLOWANCE_SCALE:
         return FAMILY_ALLOWANCE_SCALE[nombre_enfants]
 
-    # For more than 3 children, add additional amount per child
     base_amount = FAMILY_ALLOWANCE_SCALE[3]
     additional_children = nombre_enfants - 3
     additional_amount = FAMILY_ALLOWANCE_ADDITIONAL * additional_children
-
     return base_amount + additional_amount
 
 
 def calculate_inss_employer(gross_salary: Decimal) -> Dict[str, Decimal]:
-    """
-    Calculate employer INSS contributions (pension + risk).
-
-    Args:
-        gross_salary: Gross salary amount
-
-    Returns:
-        Dict with pension, risk, and total contributions
-
-    Example:
-        >>> calculate_inss_employer(Decimal("100000"))
-        {'pension': Decimal('6000'), 'risk': Decimal('2400'), 'total': Decimal('8400')}
-    """
+    """Calcule les contributions patronales INSS (pension + risques)."""
     pension = min(gross_salary * INSS_PENSION_RATE, INSS_PENSION_CAP)
     risk = min(gross_salary * INSS_RISK_RATE, INSS_RISK_CAP)
-
     return {
         "pension": pension,
         "risk": risk,
-        "total": pension + risk
+        "total": pension + risk,
     }
 
 
 def calculate_inss_employee(gross_salary: Decimal) -> Decimal:
-    """
-    Calculate employee INSS contribution.
-
-    Args:
-        gross_salary: Gross salary amount
-
-    Returns:
-        Employee INSS contribution amount
-
-    Example:
-        >>> calculate_inss_employee(Decimal("100000"))
-        Decimal('4000')  # 100000 * 0.04
-        >>> calculate_inss_employee(Decimal("500000"))
-        Decimal('18000')  # Capped at 18000
-    """
+    """Calcule la contribution salariale INSS."""
     return min(gross_salary * INSS_EMPLOYEE_RATE, INSS_EMPLOYEE_CAP)
-
-
-def validate_period_status_transition(
-    current_status: str,
-    new_status: str
-) -> bool:
-    """
-    Validate if a period status transition is allowed.
-
-    Args:
-        current_status: Current period status
-        new_status: Desired new status
-
-    Returns:
-        True if transition is allowed, False otherwise
-
-    Allowed transitions:
-        DRAFT -> PROCESSING
-        PROCESSING -> COMPLETED
-        COMPLETED -> FINALIZED
-        FINALIZED -> APPROVED
-        APPROVED -> PAID
-        PAID -> ARCHIVED
-    """
-    allowed_transitions = {
-        "DRAFT": ["PROCESSING"],
-        "PROCESSING": ["COMPLETED", "DRAFT"],
-        "COMPLETED": ["FINALIZED", "PROCESSING"],
-        "FINALIZED": ["APPROVED", "COMPLETED"],
-        "APPROVED": ["PAID"],
-        "PAID": ["ARCHIVED"],
-        "ARCHIVED": []  # No transitions from archived
-    }
-
-    allowed = allowed_transitions.get(current_status, [])
-    return new_status in allowed

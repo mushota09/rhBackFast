@@ -25,11 +25,12 @@ from app.conge_app.models import (
 )
 from app.conge_app.services.attribution_service import AttributionService
 from app.paie_app.models import PeriodePaie
-from app.paie_app.workflow_constants import (
+from app.paie_app.constants import (
     STATUT_TEXTUEL_PAR_CODE,
     CodeProcessusPaie,
     CodeStatutPaie,
     DemandeTypePaie,
+    StatutAttribution,
 )
 
 
@@ -158,7 +159,7 @@ class PaieWorkflowService:
         )
         if attribution is None:
             return False
-        return attribution.statut == "prise_en_charge"
+        return attribution.statut == StatutAttribution.PRISE_EN_CHARGE.value
 
     # ------------------------------------------------------------------
     # Application d'une action
