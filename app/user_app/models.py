@@ -9,6 +9,18 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.user_app.constants import (
+    DEFAULT_DEVISE,
+    DEVISE_MAX_LENGTH,
+    SEXE_MAX_LENGTH,
+    STATUT_EMPLOI_MAX_LENGTH,
+    STATUT_MATRIMONIAL_MAX_LENGTH,
+    TYPE_CONTRAT_MAX_LENGTH,
+    Sexe,
+    StatutEmploi,
+    StatutMatrimonial,
+    TypeContrat,
+)
 
 if TYPE_CHECKING:
     from app.paie_app.models import RetenueEmploye, Alert
@@ -232,8 +244,10 @@ class Employe(BaseModel):
     nom: Mapped[str] = mapped_column(String(255))
     postnom: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     date_naissance: Mapped[Date] = mapped_column(Date)
-    sexe: Mapped[str] = mapped_column(String(1))  # M, F, O
-    statut_matrimonial: Mapped[str] = mapped_column(String(1))  # S, M, D, W
+    sexe: Mapped[str] = mapped_column(String(SEXE_MAX_LENGTH))  # see Sexe enum
+    statut_matrimonial: Mapped[str] = mapped_column(
+        String(STATUT_MATRIMONIAL_MAX_LENGTH)
+    )  # see StatutMatrimonial enum
     nationalite: Mapped[str] = mapped_column(String(100))
 
     # Banking information
@@ -271,7 +285,10 @@ class Employe(BaseModel):
         nullable=True
     )
     date_embauche: Mapped[Date] = mapped_column(Date)
-    statut_emploi: Mapped[str] = mapped_column(String(20), default="ACTIVE")
+    statut_emploi: Mapped[str] = mapped_column(
+        String(STATUT_EMPLOI_MAX_LENGTH),
+        default=StatutEmploi.ACTIVE.value,
+    )
 
     # Family information
     nombre_enfants: Mapped[int] = mapped_column(Integer, default=0)
@@ -315,17 +332,20 @@ class Employe(BaseModel):
     )
 
     # Table constraints
+    # CHECK expressions are rebuilt from the corresponding enum in
+    # app.user_app.constants so that the DB constraint stays in sync with
+    # the Python-level source of truth.
     __table_args__ = (
         CheckConstraint(
-            "sexe IN ('M', 'F', 'O')",
+            Sexe.check_constraint_expression("sexe"),
             name="ck_employe_sexe"
         ),
         CheckConstraint(
-            "statut_matrimonial IN ('S', 'M', 'D', 'W')",
+            StatutMatrimonial.check_constraint_expression("statut_matrimonial"),
             name="ck_employe_statut_matrimonial"
         ),
         CheckConstraint(
-            "statut_emploi IN ('ACTIVE', 'INACTIVE', 'TERMINATED', 'SUSPENDED')",
+            StatutEmploi.check_constraint_expression("statut_emploi"),
             name="ck_employe_statut_emploi"
         ),
         CheckConstraint(
@@ -358,7 +378,9 @@ class Contrat(BaseModel):
     employe_id: Mapped[int] = mapped_column(
         ForeignKey("rh_employe.id", ondelete="CASCADE")
     )
-    type_contrat: Mapped[str] = mapped_column(String(50))  # CDI, CDD, Stage, etc.
+    type_contrat: Mapped[str] = mapped_column(
+        String(TYPE_CONTRAT_MAX_LENGTH)
+    )  # see TypeContrat enum
     date_debut: Mapped[Date] = mapped_column(Date)
     date_fin: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
 
@@ -377,7 +399,9 @@ class Contrat(BaseModel):
     fpc_patronale: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     fpc_salariale: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
 
-    devise: Mapped[str] = mapped_column(String(3), default="USD")
+    devise: Mapped[str] = mapped_column(
+        String(DEVISE_MAX_LENGTH), default=DEFAULT_DEVISE
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Relationships
@@ -386,7 +410,7 @@ class Contrat(BaseModel):
     # Table constraints
     __table_args__ = (
         CheckConstraint(
-            "type_contrat IN ('CDI', 'CDD', 'STAGE', 'CONSULTANT')",
+            TypeContrat.check_constraint_expression("type_contrat"),
             name="ck_contrat_type_contrat"
         ),
         CheckConstraint(
