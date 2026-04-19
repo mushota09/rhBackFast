@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.permissions import require_permission
 from app.core.config import settings
+from app.core.query_utils import apply_expansion, parse_expand_param
 from app.user_app.models import User
 from app.paie_app import schemas
 from app.paie_app.models import (
@@ -35,11 +36,16 @@ alert_router = APIRouter(prefix="/alerts", tags=["Alerts"])
 async def list_alerts(
     skip: int = 0,
     limit: int = 100,
+    expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("alert", "view"))
 ):
-    """List all alerts"""
-    result = await db.execute(select(Alert).offset(skip).limit(limit))
+    """List all alerts (optional ?expand=employe)"""
+    query = select(Alert)
+    if expand:
+        query = apply_expansion(query, Alert, parse_expand_param(expand))
+    query = query.offset(skip).limit(limit)
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -77,11 +83,15 @@ async def create_alert(
 @alert_router.get("/{alert_id}", response_model=schemas.AlertResponse)
 async def get_alert(
     alert_id: int,
+    expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("alert", "view"))
 ):
-    """Get alert by ID"""
-    result = await db.execute(select(Alert).where(Alert.id == alert_id))
+    """Get alert by ID (optional ?expand=employe)"""
+    query = select(Alert).where(Alert.id == alert_id)
+    if expand:
+        query = apply_expansion(query, Alert, parse_expand_param(expand))
+    result = await db.execute(query)
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -133,13 +143,16 @@ async def list_retenues(
     skip: int = 0,
     limit: int = 100,
     employe_id: int = Query(None),
+    expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("retenue", "view"))
 ):
-    """List all employee deductions"""
+    """List all employee deductions (optional ?expand=employe)"""
     query = select(RetenueEmploye)
     if employe_id:
         query = query.where(RetenueEmploye.employe_id == employe_id)
+    if expand:
+        query = apply_expansion(query, RetenueEmploye, parse_expand_param(expand))
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
@@ -188,15 +201,18 @@ async def list_periodes(
     limit: int = 100,
     annee: int = Query(None),
     mois: int = Query(None),
+    expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("periode", "view"))
 ):
-    """List all payroll periods"""
+    """List all payroll periods (optional ?expand=entries,etape_courante,statut_global,responsable)"""
     query = select(PeriodePaie)
     if annee:
         query = query.where(PeriodePaie.annee == annee)
     if mois:
         query = query.where(PeriodePaie.mois == mois)
+    if expand:
+        query = apply_expansion(query, PeriodePaie, parse_expand_param(expand))
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
@@ -327,13 +343,16 @@ async def list_entrees(
     skip: int = 0,
     limit: int = 100,
     periode_id: int = Query(None),
+    expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("entree", "view"))
 ):
-    """List all payroll entries"""
+    """List all payroll entries (optional ?expand=employe,periode_paie)"""
     query = select(EntreePaie)
     if periode_id:
         query = query.where(EntreePaie.periode_paie_id == periode_id)
+    if expand:
+        query = apply_expansion(query, EntreePaie, parse_expand_param(expand))
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()

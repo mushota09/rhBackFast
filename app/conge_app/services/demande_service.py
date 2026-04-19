@@ -155,14 +155,19 @@ class DemandeCongeService:
         mode_valideur_employe_id: int | None = None,
         skip: int = 0,
         limit: int = 100,
+        expand_options: list | None = None,
     ) -> tuple[list[DemandeConge], int]:
         """Liste les demandes.
 
         - ``employe_id`` : filtre par auteur.
         - ``mode_valideur_employe_id`` : liste les demandes dont l'étape courante est
           attribuée à cet employé avec statut ``prise_en_charge`` **ou** ``en_attente``.
+        - ``expand_options`` : options SQLAlchemy (``selectinload(...)``) à appliquer
+          pour le chargement optionnel des relations.
         """
         stmt = select(DemandeConge)
+        if expand_options:
+            stmt = stmt.options(*expand_options)
 
         if mode_valideur_employe_id is not None:
             sub = select(DemandeAttribution.demande_id).where(

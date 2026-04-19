@@ -58,6 +58,7 @@ from app.conge_app.services.workflow_service import (
 )
 from app.core.database import get_db
 from app.core.permissions import require_permission
+from app.core.query_utils import apply_expansion, build_expand_options, parse_expand_param
 from app.user_app.models import Employe, User
 
 
@@ -91,6 +92,7 @@ async def list_types_conge(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     search: Optional[str] = Query(None),
+    expand: Optional[str] = Query(None, description="Relations à inclure (soldes, demandes)"),
 ):
     stmt = select(TypeConge)
     count_stmt = select(func.count()).select_from(TypeConge)
@@ -101,6 +103,8 @@ async def list_types_conge(
             or_(TypeConge.nom.ilike(like), TypeConge.code.ilike(like))
         )
     total = (await db.execute(count_stmt)).scalar() or 0
+    if expand:
+        stmt = apply_expansion(stmt, TypeConge, parse_expand_param(expand))
     stmt = stmt.order_by(TypeConge.nom.asc()).offset(skip).limit(limit)
     items = (await db.execute(stmt)).scalars().all()
     return PaginatedTypeConge(
@@ -172,6 +176,7 @@ async def delete_type_conge(
 @router.get("/soldes/me", response_model=list[SoldeCongeResponse])
 async def list_my_soldes(
     annee: Optional[int] = Query(None, ge=2000, le=2100),
+    expand: Optional[str] = Query(None, description="Relations à inclure (type_conge)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("conge", "view")),
 ):
@@ -179,6 +184,8 @@ async def list_my_soldes(
     stmt = select(SoldeConge).where(SoldeConge.employe_id == employe_id)
     if annee is not None:
         stmt = stmt.where(SoldeConge.annee == annee)
+    if expand:
+        stmt = apply_expansion(stmt, SoldeConge, parse_expand_param(expand))
     stmt = stmt.order_by(SoldeConge.annee.desc())
     items = (await db.execute(stmt)).scalars().all()
     return [SoldeCongeResponse.model_validate(i) for i in items]
@@ -191,6 +198,7 @@ async def list_soldes(
     type_conge_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    expand: Optional[str] = Query(None, description="Relations à inclure (type_conge)"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permission("conge", "manage_soldes")),
 ):
@@ -207,6 +215,8 @@ async def list_soldes(
         stmt = stmt.where(and_(*clauses))
         count_stmt = count_stmt.where(and_(*clauses))
     total = (await db.execute(count_stmt)).scalar() or 0
+    if expand:
+        stmt = apply_expansion(stmt, SoldeConge, parse_expand_param(expand))
     stmt = stmt.order_by(SoldeConge.annee.desc()).offset(skip).limit(limit)
     items = (await db.execute(stmt)).scalars().all()
     return PaginatedSoldeConge(
@@ -295,14 +305,17 @@ async def create_statut(
 @router.get("/workflow/etapes", response_model=list[EtapeProcessusResponse])
 async def list_etapes(
     code_processus: str = Query(CodeProcessus.CONGE.value),
+    expand: Optional[str] = Query(None, description="Relations à inclure (actions)"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permission("conge", "manage_workflow")),
 ):
     stmt = (
         select(EtapeProcessus)
         .where(EtapeProcessus.code_processus == code_processus)
-        .order_by(EtapeProcessus.ordre.asc())
     )
+    if expand:
+        stmt = apply_expansion(stmt, EtapeProcessus, parse_expand_param(expand))
+    stmt = stmt.order_by(EtapeProcessus.ordre.asc())
     items = (await db.execute(stmt)).scalars().all()
     return [EtapeProcessusResponse.model_validate(i) for i in items]
 
@@ -366,12 +379,15 @@ async def delete_etape(
 @router.get("/workflow/actions", response_model=list[ActionEtapeResponse])
 async def list_actions(
     etape_id: Optional[int] = Query(None),
+    expand: Optional[str] = Query(None, description="Relations à inclure (etape, statut_cible, etape_suivante)"),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permission("conge", "manage_workflow")),
 ):
     stmt = select(ActionEtapeProcessus)
     if etape_id is not None:
         stmt = stmt.where(ActionEtapeProcessus.etape_id == etape_id)
+    if expand:
+        stmt = apply_expansion(stmt, ActionEtapeProcessus, parse_expand_param(expand))
     stmt = stmt.order_by(ActionEtapeProcessus.id.asc())
     items = (await db.execute(stmt)).scalars().all()
     return [ActionEtapeResponse.model_validate(i) for i in items]
@@ -486,6 +502,10 @@ async def list_demandes(
     employe_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    expand: Optional[str] = Query(
+        None,
+        description="Relations à inclure (type_conge, etape_courante, statut_global)",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("conge", "view")),
 ):
@@ -509,12 +529,14 @@ async def list_demandes(
             detail="mode doit valoir 'mine', 'a_valider' ou 'all'",
         )
 
+    expand_options = _build_demande_expand_options(expand)
     items, total = await DemandeCongeService.list_demandes(
         db,
         employe_id=filter_employe,
         mode_valideur_employe_id=valideur_filter,
         skip=skip,
         limit=limit,
+        expand_options=expand_options,
     )
     return PaginatedDemandeConge(
         items=[DemandeCongeResponse.model_validate(i) for i in items],
@@ -522,6 +544,18 @@ async def list_demandes(
         skip=skip,
         limit=limit,
     )
+
+
+def _build_demande_expand_options(expand: Optional[str]) -> list:
+    """Construit les options ``selectinload`` pour ``DemandeConge``.
+
+    Utilise l'utilitaire générique ``build_expand_options`` pour transformer
+    le paramètre `?expand=...` en chaînes de ``selectinload`` prêtes à être
+    passées à ``select(...).options(*opts)`` côté service.
+    """
+    if not expand:
+        return []
+    return build_expand_options(DemandeConge, parse_expand_param(expand))
 
 
 async def _fetch_demande_or_404(db: AsyncSession, demande_id: int) -> DemandeConge:
@@ -544,10 +578,21 @@ def _assert_can_view_demande(current_user: User, demande: DemandeConge) -> None:
 @router.get("/demandes/{demande_id}", response_model=DemandeCongeDetail)
 async def get_demande(
     demande_id: int,
+    expand: Optional[str] = Query(
+        None,
+        description="Relations à inclure (type_conge, etape_courante, statut_global)",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("conge", "view")),
 ):
-    demande = await _fetch_demande_or_404(db, demande_id)
+    options = _build_demande_expand_options(expand)
+    if options:
+        stmt = select(DemandeConge).options(*options).where(DemandeConge.id == demande_id)
+        demande = (await db.execute(stmt)).scalar_one_or_none()
+        if demande is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable")
+    else:
+        demande = await _fetch_demande_or_404(db, demande_id)
     _assert_can_view_demande(current_user, demande)
 
     hist_stmt = (

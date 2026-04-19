@@ -87,6 +87,38 @@ def apply_ordering(query: Select, model: Any, ordering: Optional[str]) -> Select
     return query
 
 
+def build_expand_options(model: Any, expand_fields: List[str]) -> List[Any]:
+    """Build `selectinload` option chains for the given model and expand paths.
+
+    Returns a list of SQLAlchemy loader options that can be passed directly to
+    ``select(...).options(*opts)`` or ``query.options(*opts)``. Unknown paths
+    are silently skipped (consistent with :func:`apply_expansion`).
+    """
+    options: List[Any] = []
+    if not expand_fields:
+        return options
+
+    for field in expand_fields:
+        if '.' not in field:
+            if hasattr(model, field):
+                options.append(selectinload(getattr(model, field)))
+            continue
+        parts = field.split('.')
+        current_model = model
+        loader = None
+        for i, part in enumerate(parts):
+            if not hasattr(current_model, part):
+                loader = None
+                break
+            attr = getattr(current_model, part)
+            loader = selectinload(attr) if i == 0 else loader.selectinload(attr)
+            if hasattr(attr.property, 'mapper'):
+                current_model = attr.property.mapper.class_
+        if loader is not None:
+            options.append(loader)
+    return options
+
+
 def apply_expansion(
     query: Select,
     model: Any,
@@ -108,45 +140,9 @@ def apply_expansion(
         expand_fields = ['poste.service', 'poste.group']
         expand_fields = ['user.employe.poste']
     """
-    if not expand_fields:
-        return query
-
-    # Process each expand field independently
-    for field in expand_fields:
-        if '.' not in field:
-            # Simple expansion like 'poste'
-            if hasattr(model, field):
-                query = query.options(selectinload(getattr(model, field)))
-        else:
-            # Nested expansion like 'poste.service' or 'user.employe.poste'
-            parts = field.split('.')
-
-            # Build the loader chain from the parts
-            current_model = model
-            loader = None
-
-            for i, part in enumerate(parts):
-                if hasattr(current_model, part):
-                    attr = getattr(current_model, part)
-
-                    if i == 0:
-                        # First level
-                        loader = selectinload(attr)
-                    else:
-                        # Subsequent levels
-                        loader = loader.selectinload(attr)
-
-                    # Get the related model for next iteration
-                    if hasattr(attr.property, 'mapper'):
-                        current_model = attr.property.mapper.class_
-                else:
-                    # Attribute doesn't exist, skip this expansion
-                    break
-
-            # Apply the complete loader chain
-            if loader is not None:
-                query = query.options(loader)
-
+    options = build_expand_options(model, expand_fields)
+    if options:
+        query = query.options(*options)
     return query
 
 
