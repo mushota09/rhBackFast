@@ -852,6 +852,8 @@ async def get_retenue_modification_history(
 # Main Router
 def get_paie_app_router():
     """Get the main paie_app router"""
+    from app.paie_app.workflow_routes import workflow_router
+
     main_router = APIRouter()
     main_router.include_router(alert_router)
     main_router.include_router(retenue_router)
@@ -860,4 +862,5 @@ def get_paie_app_router():
     main_router.include_router(payroll_router)
     main_router.include_router(statistics_router)
     main_router.include_router(history_router)
+    main_router.include_router(workflow_router)
     return main_router

@@ -17,6 +17,8 @@ from app.core.database import Base
 from app.user_app.models import Permission
 from app.conge_app.constants import PERMISSIONS as CONGE_PERMISSIONS
 from app.conge_app.init_data import init_conge_defaults
+from app.paie_app.init_data import init_paie_workflow_defaults
+from app.paie_app.workflow_constants import WORKFLOW_PERMISSIONS as PAIE_WORKFLOW_PERMISSIONS
 
 
 # Audit app permissions
@@ -37,6 +39,7 @@ PAIE_PERMISSIONS = {
     "entree.view": "Consulter les entrées de paie",
     "entree.update": "Modifier les entrées de paie",
     "payroll.view": "Consulter et exporter la paie",
+    **PAIE_WORKFLOW_PERMISSIONS,
 }
 
 
@@ -324,6 +327,34 @@ async def init_conge_workflow_defaults():
         await engine.dispose()
 
 
+async def init_paie_workflow_defaults_task():
+    """Initialise les données par défaut du workflow paie (statuts + étapes + actions).
+
+    Désactivable via ``PAIE_INIT_DEFAULTS=False``. Idempotent.
+    """
+    if not getattr(settings, "PAIE_INIT_DEFAULTS", True):
+        print("⏭️  Paie workflow defaults init disabled")
+        return
+
+    print("\n💰 Initializing PAIE workflow defaults...")
+
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    try:
+        async with async_session() as session:
+            await init_paie_workflow_defaults(session)
+        print("✓ PAIE workflow defaults initialization complete\n")
+    except Exception as e:
+        print(f"❌ Error initializing PAIE workflow defaults: {e}\n")
+    finally:
+        await engine.dispose()
+
+
 async def run_startup_tasks():
     """
     Run all startup tasks.
@@ -331,6 +362,7 @@ async def run_startup_tasks():
     """
     await create_default_permissions()
     await init_conge_workflow_defaults()
+    await init_paie_workflow_defaults_task()
     # Add other startup tasks here in the future
 
 
