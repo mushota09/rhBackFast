@@ -160,7 +160,8 @@ async def list_services(
     limit: int = 100,
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("service", "read"))
 ):
     """List all services with optional pagination and expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -200,7 +201,7 @@ async def list_services(
 async def create_service(
     service: schemas.ServiceCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("service", "create"))
 ):
     """Create a new service"""
     # Check if code already exists
@@ -224,7 +225,8 @@ async def create_service(
 async def get_service(
     service_id: int,
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("service", "read"))
 ):
     """Get service by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -247,7 +249,7 @@ async def update_service(
     service_id: int,
     service_update: schemas.ServiceUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("service", "update"))
 ):
     """Update service"""
     from sqlalchemy import select
@@ -270,7 +272,7 @@ async def update_service(
 async def delete_service(
     service_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("service", "delete"))
 ):
     """Delete service"""
     from sqlalchemy import select
@@ -304,7 +306,8 @@ async def list_service_groups(
     limit: int = 100,
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("service_group", "read"))
 ):
     """List service groups with optional filters and pagination"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -360,7 +363,7 @@ async def list_service_groups(
 async def create_service_group(
     service_group: schemas.ServiceGroupCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("service_group", "create"))
 ):
     """Create a service group association"""
     from app.user_app.models import ServiceGroup
@@ -413,7 +416,8 @@ async def create_service_group(
 async def get_service_group(
     service_group_id: int,
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("service_group", "read"))
 ):
     """Get service group by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -441,7 +445,7 @@ async def update_service_group(
     service_group_id: int,
     service_group_update: schemas.ServiceGroupUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("service_group", "update"))
 ):
     """Update service group"""
     from app.user_app.models import ServiceGroup
@@ -467,7 +471,7 @@ async def update_service_group(
 async def delete_service_group(
     service_group_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("service_group", "delete"))
 ):
     """Delete service group"""
     from app.user_app.models import ServiceGroup
@@ -498,7 +502,8 @@ async def list_groups(
     limit: int = 100,
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("group", "read"))
 ):
     """List all groups with optional pagination and expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -548,7 +553,7 @@ async def list_groups(
 async def create_group(
     group: schemas.GroupCreateWithServices,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("group", "create"))
 ):
     """Create a new group with service associations"""
     try:
@@ -570,7 +575,8 @@ async def create_group(
 async def get_group(
     group_id: int,
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("group", "read"))
 ):
     """Get group by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -594,7 +600,7 @@ async def update_group(
     group_id: int,
     group_update: schemas.GroupUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("group", "update"))
 ):
     """Update group"""
     from sqlalchemy import select
@@ -617,7 +623,7 @@ async def update_group(
 async def delete_group(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("group", "delete"))
 ):
     """Delete group with validation"""
     try:
@@ -647,7 +653,8 @@ async def list_employees(
     skip: int = 0,
     limit: int = 100,
     no_pagination: bool = Query(False),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("employe", "read"))
 ):
     """List all employees with filters, search, and pagination"""
     from app.core.query_utils import parse_expand_param, apply_expansion, apply_search, apply_ordering
@@ -709,7 +716,7 @@ async def create_employee(
     employee: schemas.EmployeCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    # current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "create"))
 ):
     """Create a new employee (basic creation without user account)"""
     try:
@@ -739,7 +746,7 @@ async def create_employee_with_user(
     employee: schemas.EmployeCreateWithUser,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission("employe", "CREATE"))
+    current_user: User = Depends(require_permission("employe", "create"))
 ):
     """
     Create employee with user account and optional group assignment
@@ -784,7 +791,7 @@ async def create_complete_employee(
     files: List[UploadFile] = File(default=[]),
     password: Optional[str] = Form(default="12345678"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission("employe", "CREATE"))
+    current_user: User = Depends(require_permission("employe", "create"))
 ):
     """
     Create complete employee with contract, documents, user account,
@@ -900,7 +907,8 @@ async def create_complete_employee(
 async def get_employee(
     employee_id: int,
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("employe", "read"))
 ):
     """Get employee by ID with optional relation expansion"""
     employee = await EmployeeService.get_with_relations(
@@ -917,7 +925,7 @@ async def update_employee(
     employee_update: schemas.EmployeUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "update"))
 ):
     """Update employee"""
     from sqlalchemy import select
@@ -955,7 +963,7 @@ async def delete_employee(
     employee_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "delete"))
 ):
     """Delete employee"""
     from sqlalchemy import select
@@ -991,7 +999,7 @@ async def export_employees(
     format: str = Query("excel", pattern="^(excel|csv|json)$"),
     request: Request = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("employe", "read"))
 ):
     """
     Export employees data
@@ -1033,7 +1041,8 @@ async def list_permissions(
     limit: int = 100,
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("permission", "read"))
 ):
     """List all permissions with optional pagination and expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1074,7 +1083,8 @@ async def list_permissions(
 async def get_permission(
     permission_id: int,
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("permission", "read"))
 ):
     """Get permission by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1097,7 +1107,7 @@ async def get_permission(
 async def create_permission(
     permission: schemas.PermissionCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("permission", "create"))
 ):
     """Create a new permission"""
     # Check if permission already exists
@@ -1140,7 +1150,8 @@ async def list_group_permissions(
     limit: int = 100,
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("group_permission", "read"))
 ):
     """List group permissions with filters, pagination, and expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1198,7 +1209,8 @@ async def list_group_permissions(
 async def get_group_permission(
     group_permission_id: int,
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("group_permission", "read"))
 ):
     """Get group permission by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1225,7 +1237,7 @@ async def get_group_permission(
 async def create_group_permission(
     group_permission: schemas.GroupPermissionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("group_permission", "create"))
 ):
     """Create a group permission assignment"""
     try:
@@ -1254,7 +1266,7 @@ async def update_group_permission(
     group_permission_id: int,
     group_permission_update: schemas.GroupPermissionUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("group_permission", "update"))
 ):
     """Update group permission (granted flag)"""
     from sqlalchemy import select
@@ -1277,7 +1289,7 @@ async def update_group_permission(
 async def delete_group_permission(
     group_permission_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("group_permission", "delete"))
 ):
     """Delete group permission"""
     from sqlalchemy import select
@@ -1300,7 +1312,7 @@ async def delete_group_permission(
 async def get_user_permissions(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    # _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("permission", "read"))
 ):
     """Get user's effective permissions based on group memberships"""
     from sqlalchemy import select
@@ -1333,7 +1345,7 @@ async def list_contracts(
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("contrat", "read"))
 ):
     """List contracts with optional filters and pagination"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1388,7 +1400,7 @@ async def list_contracts(
 async def create_contract(
     contract: schemas.ContratCreate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("contrat", "create"))
 ):
     """Create a new contract"""
     # Validate employee exists
@@ -1414,7 +1426,7 @@ async def get_contract(
     contract_id: int,
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("contrat", "read"))
 ):
     """Get contract by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1438,7 +1450,7 @@ async def update_contract(
     contract_id: int,
     contract_update: schemas.ContratUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("contrat", "update"))
 ):
     """Update contract"""
     result = await db.execute(
@@ -1462,7 +1474,7 @@ async def update_contract(
 async def delete_contract(
     contract_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("contrat", "delete"))
 ):
     """Delete contract"""
     result = await db.execute(
@@ -1491,7 +1503,7 @@ async def list_users(
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    # _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("user", "read"))
 ):
     """List all users with optional pagination and expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1533,7 +1545,7 @@ async def create_user(
     user: schemas.UserCreate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    # current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("user", "create"))
 ):
     """Create a new user"""
     # Check if email already exists
@@ -1573,7 +1585,7 @@ async def get_user(
     user_id: int,
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("user", "read"))
 ):
     """Get user by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1598,7 +1610,7 @@ async def update_user(
     user_update: schemas.UserUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("user", "update"))
 ):
     """Update user"""
     result = await db.execute(
@@ -1642,7 +1654,7 @@ async def delete_user(
     user_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("user", "delete"))
 ):
     """Delete user"""
     result = await db.execute(
@@ -1688,7 +1700,7 @@ async def list_documents(
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("document", "read"))
 ):
     """List documents with optional filters and pagination"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1743,7 +1755,7 @@ async def list_documents(
 async def create_document(
     document: schemas.DocumentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("document", "create"))
 ):
     """Create a new document"""
     # Validate employee exists
@@ -1768,7 +1780,7 @@ async def get_document(
     document_id: int,
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("document", "read"))
 ):
     """Get document by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1792,7 +1804,7 @@ async def update_document(
     document_id: int,
     document_update: schemas.DocumentUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("document", "update"))
 ):
     """Update document"""
     result = await db.execute(
@@ -1816,7 +1828,7 @@ async def update_document(
 async def delete_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("document", "delete"))
 ):
     """Delete document"""
     result = await db.execute(
@@ -1848,7 +1860,7 @@ async def list_user_groups(
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    # _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("user_group", "read"))
 ):
     """List user groups with optional filters and pagination"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1907,7 +1919,7 @@ async def list_user_groups(
 async def create_user_group(
     user_group: schemas.UserGroupCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("user_group", "create"))
 ):
     """Create a user group assignment"""
     # Validate user exists
@@ -1963,7 +1975,7 @@ async def get_user_group(
     user_group_id: int,
     expand: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("user_group", "read"))
 ):
     """Get user group by ID with optional expansion"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -1990,7 +2002,7 @@ async def update_user_group(
     user_group_id: int,
     user_group_update: schemas.UserGroupUpdate,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("user_group", "update"))
 ):
     """Update user group (is_active status)"""
     result = await db.execute(
@@ -2013,7 +2025,7 @@ async def update_user_group(
 async def delete_user_group(
     user_group_id: int,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("user_group", "delete"))
 ):
     """Delete user group"""
     result = await db.execute(
@@ -2040,7 +2052,7 @@ async def delete_user_group(
 async def bulk_assign_users_to_groups(
     data: schemas.BulkUserGroupAssign,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("user_group", "update"))
 ):
     """
     Bulk assign users to groups
@@ -2155,7 +2167,7 @@ async def bulk_assign_users_to_groups(
 async def bulk_remove_users_from_groups(
     data: schemas.BulkUserGroupRemove,
     db: AsyncSession = Depends(get_db),
-    _current_user: User = Depends(get_current_user)
+    _current_user: User = Depends(require_permission("user_group", "update"))
 ):
     """
     Bulk remove users from groups
@@ -2231,7 +2243,7 @@ async def bulk_update_group_permissions(
     group_id: int,
     data: schemas.BulkGroupPermissionUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("group_permission", "update"))
 ):
     """
     Bulk update group permissions
@@ -2367,7 +2379,8 @@ async def list_postes(
     limit: int = 100,
     no_pagination: bool = Query(False),
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("poste", "read"))
 ):
     """
     List all postes (ServiceGroups with their associated Groups)
@@ -2439,7 +2452,7 @@ async def list_postes(
 async def create_poste(
     poste: schemas.PosteCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("poste", "create"))
 ):
     """
     Create a new poste (creates Group + ServiceGroup)
@@ -2524,7 +2537,8 @@ async def create_poste(
 async def get_poste(
     poste_id: int,
     expand: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(require_permission("poste", "read"))
 ):
     """Get poste by ID (ServiceGroup ID)"""
     from app.core.query_utils import parse_expand_param, apply_expansion
@@ -2563,7 +2577,7 @@ async def update_poste(
     poste_id: int,
     poste_update: schemas.PosteUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("poste", "update"))
 ):
     """
     Update poste (updates Group and optionally ServiceGroup)
@@ -2663,7 +2677,7 @@ async def update_poste(
 async def delete_poste(
     poste_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission("poste", "delete"))
 ):
     """
     Delete poste (deletes ServiceGroup and associated Group)
