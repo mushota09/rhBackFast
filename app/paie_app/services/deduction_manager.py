@@ -130,6 +130,7 @@ class DeductionManagerService:
             raise ValueError(f"Deduction {retenue_id} not found")
 
         # Track modification
+        old_values = None
         if user:
             from app.paie_app.services.modification_history_service import (
                 ModificationHistoryService

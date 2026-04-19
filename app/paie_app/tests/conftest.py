@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
+from typing import AsyncGenerator
 
 import pytest
 import pytest_asyncio
@@ -87,7 +88,7 @@ async def engine():
 
 
 @pytest_asyncio.fixture
-async def db(engine) -> AsyncSession:
+async def db(engine) -> AsyncGenerator[AsyncSession, None]:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     async with session_factory() as session:
         yield session
