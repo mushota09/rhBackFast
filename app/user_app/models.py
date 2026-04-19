@@ -1,5 +1,5 @@
 """User management models"""
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional, TYPE_CHECKING
 from sqlalchemy import (
     String, Integer, Boolean, DateTime, Date, Text,
@@ -174,12 +174,13 @@ class Permission(BaseModel):
     )
 
     # Table constraints
+    # NOTE: no CHECK constraint on `action` — the set of valid actions is
+    # driven by the application (create_permissions.py + custom workflows)
+    # and must remain extensible (APPROVE, MANAGE_TYPES, MANAGE_SOLDES,
+    # MANAGE_WORKFLOW, EXPORT, VIEW, ...). The authoritative match happens
+    # on `codename` in PermissionService.check_permission.
     __table_args__ = (
         UniqueConstraint('resource', 'action', name='uq_permission_resource_action'),
-        CheckConstraint(
-            "action IN ('CREATE', 'READ', 'UPDATE', 'DELETE')",
-            name="ck_permission_action"
-        ),
     )
 
     def __str__(self) -> str:
