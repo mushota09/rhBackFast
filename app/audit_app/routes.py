@@ -1,5 +1,5 @@
 """API routes for audit log management"""
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,6 @@ from app.user_app.models import User
 from app.audit_app.models import AuditLog
 from app.audit_app.schemas import (
     AuditLogResponse,
-    AuditLogFilter,
     PaginatedAuditLogs,
     AuditLogStats
 )

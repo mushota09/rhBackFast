@@ -2724,7 +2724,7 @@ async def delete_poste(
                 select(func.count(UserGroup.id))
                 .where(
                     UserGroup.group_id == group_id,
-                    UserGroup.is_active == True
+                    UserGroup.is_active.is_(True)
                 )
             )
             active_users_count = result.scalar() or 0

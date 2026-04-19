@@ -6,12 +6,12 @@ from sqlalchemy import (
     String, Integer, Boolean, DateTime,
     ForeignKey
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
 if TYPE_CHECKING:
-    from app.user_app.models import User
+    pass
 
 
 class PasswordResetOTP(Base):

@@ -2,7 +2,7 @@
 import time
 import logging
 import functools
-from typing import Callable, Optional, Any
+from typing import Callable, Optional
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -1,7 +1,7 @@
 """Business logic services for user_app"""
 from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from fastapi import BackgroundTasks
@@ -549,7 +549,7 @@ class UserService:
 
         # Validate group
         result = await db.execute(
-            select(Group).where(Group.id == group_id, Group.is_active == True)
+            select(Group).where(Group.id == group_id, Group.is_active.is_(True))
         )
         group = result.scalar_one_or_none()
         if not group:
@@ -696,7 +696,7 @@ class GroupService:
             select(func.count(UserGroup.id))
             .where(
                 UserGroup.group_id == group_id,
-                UserGroup.is_active == True
+                UserGroup.is_active.is_(True)
             )
         )
         user_count = active_users_result.scalar() or 0
@@ -758,7 +758,7 @@ class GroupService:
             query = query.where(Group.is_active == is_active)
         elif is_active is None:
             # Default: only active groups
-            query = query.where(Group.is_active == True)
+            query = query.where(Group.is_active.is_(True))
 
         # Apply expansion
         if expand:
@@ -782,7 +782,7 @@ class GroupService:
         total_groups = total_groups_result.scalar() or 0
 
         active_groups_result = await db.execute(
-            select(func.count(Group.id)).where(Group.is_active == True)
+            select(func.count(Group.id)).where(Group.is_active.is_(True))
         )
         active_groups = active_groups_result.scalar() or 0
 
@@ -818,7 +818,7 @@ class PermissionService:
             select(UserGroup)
             .where(
                 UserGroup.user_id == user_id,
-                UserGroup.is_active == True
+                UserGroup.is_active.is_(True)
             )
             .options(selectinload(UserGroup.group))
         )
@@ -838,7 +838,7 @@ class PermissionService:
             select(GroupPermission)
             .where(
                 GroupPermission.group_id.in_(group_ids),
-                GroupPermission.granted == True
+                GroupPermission.granted.is_(True)
             )
             .options(selectinload(GroupPermission.permission))
         )
@@ -902,7 +902,7 @@ class PermissionService:
             select(UserGroup)
             .where(
                 UserGroup.user_id == user_id,
-                UserGroup.is_active == True
+                UserGroup.is_active.is_(True)
             )
             .options(selectinload(UserGroup.group))
             .order_by(UserGroup.group_id)
@@ -930,7 +930,7 @@ class PermissionService:
                     select(GroupPermission)
                     .where(
                         GroupPermission.group_id.in_(group_ids),
-                        GroupPermission.granted == True
+                        GroupPermission.granted.is_(True)
                     )
                     .options(
                         selectinload(GroupPermission.permission),
@@ -984,7 +984,7 @@ class PermissionService:
         """
         # Validate group
         result = await db.execute(
-            select(Group).where(Group.id == group_id, Group.is_active == True)
+            select(Group).where(Group.id == group_id, Group.is_active.is_(True))
         )
         group = result.scalar_one_or_none()
         if not group:
