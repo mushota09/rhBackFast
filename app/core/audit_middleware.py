@@ -67,10 +67,20 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # Calculate execution time
         execution_time = time.time() - start_time
 
-        # Only audit certain methods or failed requests
+        # Skip if the endpoint already logged the action manually
+        # (via AuditService.log_action / log_model_change / log_export /
+        # log_login / log_logout / log_view / audit_action decorator).
+        # AuditService sets request.state.audit_logged = True whenever a
+        # request is passed to it, so we can rely on it here to avoid
+        # producing a duplicate audit entry.
+        already_logged = getattr(request.state, "audit_logged", False)
+
+        # Only audit certain methods or failed requests, and never double-log
         should_audit = (
-            request.method in self.AUDIT_METHODS or
-            response.status_code >= 400
+            not already_logged and (
+                request.method in self.AUDIT_METHODS or
+                response.status_code >= 400
+            )
         )
 
         if should_audit:
