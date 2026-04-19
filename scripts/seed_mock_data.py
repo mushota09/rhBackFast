@@ -1,8 +1,8 @@
 """Seed script producing realistic mock data for user_app, conge_app, paie_app.
 
 Idempotent: safe to run multiple times — existing rows (matched by natural
-keys such as email, matricule, (annee,mois), (employe,type,annee)...) are
-reused rather than duplicated.
+keys such as ``email``, ``matricule``, ``(annee,mois)``,
+``(employe_id, type_conge_id, annee)``...) are reused rather than duplicated.
 
 Usage::
 
@@ -10,7 +10,16 @@ Usage::
     uv run python -m scripts.seed_mock_data --reset    # delete mock rows first
     uv run python -m scripts.seed_mock_data --quiet    # minimal output
 
-The default password for all generated user accounts is ``rapha12345678``.
+Prerequisites
+-------------
+
+* ``uv run alembic upgrade head`` (creates ``cg_*`` tables + paie workflow columns).
+* ``uv run python create_permissions.py`` (optional — lets non-superuser accounts
+  actually exercise the RBAC once you've wired the group-permission links).
+
+The default password for every generated user account is ``rapha12345678``.
+This is intentional mock-data behaviour: rotate credentials before going
+anywhere near a non-dev environment.
 """
 from __future__ import annotations
 
@@ -38,6 +47,8 @@ from app.paie_app.constants import (
     AlertSeverity,
     AlertStatus,
     AlertType,
+    CodeProcessusPaie,
+    CodeStatutPaie,
     DeductionType,
     PeriodeStatutTexte,
 )
@@ -72,6 +83,7 @@ SERVICES: list[dict[str, str]] = [
     {"code": "IT", "titre": "Systèmes d'Information"},
     {"code": "FIN", "titre": "Finance & Comptabilité"},
     {"code": "OPS", "titre": "Opérations"},
+    {"code": "COM", "titre": "Commercial & Marketing"},
 ]
 
 GROUPS: list[dict[str, str]] = [
@@ -82,153 +94,318 @@ GROUPS: list[dict[str, str]] = [
 ]
 
 # (service_code, group_code) pairs that form the "postes" assignable to an
-# employee. The first item becomes the primary poste for the service lead.
+# employee.
 POSTES: list[tuple[str, str]] = [
     ("DIR", "DIRECTION"),
     ("RH", "ADMIN_RH"),
     ("RH", "MANAGER"),
+    ("RH", "EMPLOYEE"),
     ("IT", "MANAGER"),
     ("IT", "EMPLOYEE"),
     ("FIN", "MANAGER"),
     ("FIN", "EMPLOYEE"),
+    ("OPS", "MANAGER"),
     ("OPS", "EMPLOYEE"),
+    ("COM", "MANAGER"),
+    ("COM", "EMPLOYEE"),
 ]
 
 
 # ---------------------------------------------------------------------------
-# Employees + user accounts (emails hard-coded per user request)
+# Employees + user accounts (emails & matricules are the idempotency keys)
 # ---------------------------------------------------------------------------
 
-# Email list: first 4 are explicitly provided by the user, the rest are
-# imagined. Password is DEFAULT_PASSWORD for every account.
+# `manager_matricule` defines the reporting line (2-level hierarchy). The first
+# entry (boss) has None; every manager reports to the boss; every employee
+# reports to the manager of their service.
 EMPLOYEES: list[dict[str, Any]] = [
+    # --- Boss --------------------------------------------------------------
     {
+        "matricule": "EMP-001",
         "prenom": "Raphaël",
         "nom": "Mushota",
-        "matricule": "EMP-001",
-        "email_personnel": "mushota09@gmail.com",
+        "email": "mushota09@gmail.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.MARIE.value,
         "date_naissance": date(1988, 4, 12),
-        "date_embauche": date(2018, 3, 1),
-        "nationalite": "Congolaise",
+        "date_embauche": date(2015, 3, 1),
         "poste": ("DIR", "DIRECTION"),
+        "manager_matricule": None,
         "is_superuser": True,
         "is_staff": True,
-        "salaire_base": Decimal("3500000"),
+        "salaire_base": Decimal("4500000"),
         "type_contrat": TypeContrat.CDI.value,
         "nombre_enfants": 2,
         "nom_conjoint": "Aimée Mushota",
     },
+    # --- Managers (rattachés au boss) -------------------------------------
     {
+        "matricule": "EMP-002",
         "prenom": "Raphaël",
         "nom": "Mushotaraphael",
-        "matricule": "EMP-002",
-        "email_personnel": "mushotaraphael09@gmail.com",
+        "email": "mushotaraphael09@gmail.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
         "date_naissance": date(1992, 7, 22),
-        "date_embauche": date(2020, 9, 15),
-        "nationalite": "Congolaise",
+        "date_embauche": date(2018, 9, 15),
         "poste": ("RH", "ADMIN_RH"),
+        "manager_matricule": "EMP-001",
+        "is_staff": True,
+        "salaire_base": Decimal("2600000"),
+        "type_contrat": TypeContrat.CDI.value,
+    },
+    {
+        "matricule": "EMP-003",
+        "prenom": "Raphaël",
+        "nom": "Mushotaraphael",
+        "postnom": "07",
+        "email": "mushotaraphael07@gmail.com",
+        "sexe": Sexe.MASCULIN.value,
+        "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
+        "date_naissance": date(1994, 1, 30),
+        "date_embauche": date(2020, 2, 1),
+        "poste": ("RH", "MANAGER"),
+        "manager_matricule": "EMP-002",
         "is_staff": True,
         "salaire_base": Decimal("2200000"),
         "type_contrat": TypeContrat.CDI.value,
     },
     {
-        "prenom": "Raphaël",
-        "nom": "Mushotaraphael",
-        "postnom": "07",
-        "matricule": "EMP-003",
-        "email_personnel": "mushotaraphael07@gmail.com",
-        "sexe": Sexe.MASCULIN.value,
-        "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
-        "date_naissance": date(1995, 1, 30),
-        "date_embauche": date(2022, 2, 1),
-        "nationalite": "Congolaise",
-        "poste": ("RH", "MANAGER"),
-        "salaire_base": Decimal("1800000"),
-        "type_contrat": TypeContrat.CDI.value,
-    },
-    {
+        "matricule": "EMP-004",
         "prenom": "Chris",
         "nom": "Cedrick",
-        "matricule": "EMP-004",
-        "email_personnel": "chriscedrick4@gmail.com",
+        "email": "chriscedrick4@gmail.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.MARIE.value,
         "date_naissance": date(1990, 11, 5),
-        "date_embauche": date(2019, 6, 15),
-        "nationalite": "Congolaise",
+        "date_embauche": date(2017, 6, 15),
         "poste": ("IT", "MANAGER"),
+        "manager_matricule": "EMP-001",
         "is_staff": True,
-        "salaire_base": Decimal("2500000"),
+        "salaire_base": Decimal("2800000"),
         "type_contrat": TypeContrat.CDI.value,
         "nombre_enfants": 1,
         "nom_conjoint": "Sarah Cedrick",
     },
     {
-        "prenom": "Grace",
-        "nom": "Kalombo",
         "matricule": "EMP-005",
-        "email_personnel": "grace.kalombo@example.com",
-        "sexe": Sexe.FEMININ.value,
-        "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
-        "date_naissance": date(1996, 3, 18),
-        "date_embauche": date(2023, 1, 10),
-        "nationalite": "Congolaise",
-        "poste": ("IT", "EMPLOYEE"),
-        "salaire_base": Decimal("1400000"),
-        "type_contrat": TypeContrat.CDI.value,
-    },
-    {
         "prenom": "David",
         "nom": "Ilunga",
-        "matricule": "EMP-006",
-        "email_personnel": "david.ilunga@example.com",
+        "email": "david.ilunga@example.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.MARIE.value,
         "date_naissance": date(1987, 8, 9),
-        "date_embauche": date(2017, 4, 1),
-        "nationalite": "Congolaise",
+        "date_embauche": date(2016, 4, 1),
         "poste": ("FIN", "MANAGER"),
+        "manager_matricule": "EMP-001",
         "is_staff": True,
-        "salaire_base": Decimal("2400000"),
+        "salaire_base": Decimal("2700000"),
         "type_contrat": TypeContrat.CDI.value,
         "nombre_enfants": 3,
         "nom_conjoint": "Clarisse Ilunga",
     },
     {
+        "matricule": "EMP-006",
+        "prenom": "Patrick",
+        "nom": "Kabila",
+        "email": "patrick.kabila@example.com",
+        "sexe": Sexe.MASCULIN.value,
+        "statut_matrimonial": StatutMatrimonial.MARIE.value,
+        "date_naissance": date(1985, 2, 14),
+        "date_embauche": date(2016, 1, 10),
+        "poste": ("OPS", "MANAGER"),
+        "manager_matricule": "EMP-001",
+        "is_staff": True,
+        "salaire_base": Decimal("2500000"),
+        "type_contrat": TypeContrat.CDI.value,
+        "nombre_enfants": 2,
+        "nom_conjoint": "Nadège Kabila",
+    },
+    {
+        "matricule": "EMP-007",
+        "prenom": "Esther",
+        "nom": "Mbuyi",
+        "email": "esther.mbuyi@example.com",
+        "sexe": Sexe.FEMININ.value,
+        "statut_matrimonial": StatutMatrimonial.MARIE.value,
+        "date_naissance": date(1989, 6, 21),
+        "date_embauche": date(2019, 9, 3),
+        "poste": ("COM", "MANAGER"),
+        "manager_matricule": "EMP-001",
+        "is_staff": True,
+        "salaire_base": Decimal("2450000"),
+        "type_contrat": TypeContrat.CDI.value,
+        "nombre_enfants": 1,
+    },
+    # --- Employees (each reports to the manager of its service) -----------
+    {
+        "matricule": "EMP-008",
+        "prenom": "Grace",
+        "nom": "Kalombo",
+        "email": "grace.kalombo@example.com",
+        "sexe": Sexe.FEMININ.value,
+        "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
+        "date_naissance": date(1996, 3, 18),
+        "date_embauche": date(2023, 1, 10),
+        "poste": ("IT", "EMPLOYEE"),
+        "manager_matricule": "EMP-004",
+        "salaire_base": Decimal("1500000"),
+        "type_contrat": TypeContrat.CDI.value,
+    },
+    {
+        "matricule": "EMP-009",
         "prenom": "Sarah",
         "nom": "Mwanza",
-        "matricule": "EMP-007",
-        "email_personnel": "sarah.mwanza@example.com",
+        "email": "sarah.mwanza@example.com",
         "sexe": Sexe.FEMININ.value,
         "statut_matrimonial": StatutMatrimonial.MARIE.value,
         "date_naissance": date(1993, 12, 2),
         "date_embauche": date(2021, 11, 1),
-        "nationalite": "Congolaise",
         "poste": ("FIN", "EMPLOYEE"),
-        "salaire_base": Decimal("1350000"),
+        "manager_matricule": "EMP-005",
+        "salaire_base": Decimal("1400000"),
         "type_contrat": TypeContrat.CDD.value,
         "nombre_enfants": 1,
         "nom_conjoint": "Jonathan Mwanza",
     },
     {
+        "matricule": "EMP-010",
         "prenom": "Olivier",
         "nom": "Tshisekedi",
-        "matricule": "EMP-008",
-        "email_personnel": "olivier.tshisekedi@example.com",
+        "email": "olivier.tshisekedi@example.com",
         "sexe": Sexe.MASCULIN.value,
         "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
         "date_naissance": date(1998, 5, 25),
         "date_embauche": date(2024, 2, 12),
-        "nationalite": "Congolaise",
         "poste": ("OPS", "EMPLOYEE"),
-        "salaire_base": Decimal("1100000"),
+        "manager_matricule": "EMP-006",
+        "salaire_base": Decimal("1200000"),
         "type_contrat": TypeContrat.STAGE.value,
     },
+    {
+        "matricule": "EMP-011",
+        "prenom": "Aline",
+        "nom": "Kasongo",
+        "email": "aline.kasongo@example.com",
+        "sexe": Sexe.FEMININ.value,
+        "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
+        "date_naissance": date(1997, 4, 3),
+        "date_embauche": date(2022, 5, 15),
+        "poste": ("IT", "EMPLOYEE"),
+        "manager_matricule": "EMP-004",
+        "salaire_base": Decimal("1600000"),
+        "type_contrat": TypeContrat.CDI.value,
+    },
+    {
+        "matricule": "EMP-012",
+        "prenom": "Jean",
+        "nom": "Mutombo",
+        "email": "jean.mutombo@example.com",
+        "sexe": Sexe.MASCULIN.value,
+        "statut_matrimonial": StatutMatrimonial.MARIE.value,
+        "date_naissance": date(1991, 11, 18),
+        "date_embauche": date(2019, 7, 1),
+        "poste": ("FIN", "EMPLOYEE"),
+        "manager_matricule": "EMP-005",
+        "salaire_base": Decimal("1700000"),
+        "type_contrat": TypeContrat.CDI.value,
+        "nombre_enfants": 2,
+        "nom_conjoint": "Cynthia Mutombo",
+    },
+    {
+        "matricule": "EMP-013",
+        "prenom": "Marie",
+        "nom": "Bosenge",
+        "email": "marie.bosenge@example.com",
+        "sexe": Sexe.FEMININ.value,
+        "statut_matrimonial": StatutMatrimonial.MARIE.value,
+        "date_naissance": date(1990, 3, 8),
+        "date_embauche": date(2018, 10, 20),
+        "poste": ("COM", "EMPLOYEE"),
+        "manager_matricule": "EMP-007",
+        "salaire_base": Decimal("1550000"),
+        "type_contrat": TypeContrat.CDI.value,
+        "nombre_enfants": 1,
+    },
+    {
+        "matricule": "EMP-014",
+        "prenom": "Éric",
+        "nom": "Luyindula",
+        "email": "eric.luyindula@example.com",
+        "sexe": Sexe.MASCULIN.value,
+        "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
+        "date_naissance": date(1995, 9, 27),
+        "date_embauche": date(2022, 3, 1),
+        "poste": ("COM", "EMPLOYEE"),
+        "manager_matricule": "EMP-007",
+        "salaire_base": Decimal("1450000"),
+        "type_contrat": TypeContrat.CDD.value,
+    },
+    {
+        "matricule": "EMP-015",
+        "prenom": "Didier",
+        "nom": "Nkongolo",
+        "email": "didier.nkongolo@example.com",
+        "sexe": Sexe.MASCULIN.value,
+        "statut_matrimonial": StatutMatrimonial.MARIE.value,
+        "date_naissance": date(1986, 1, 5),
+        "date_embauche": date(2017, 8, 14),
+        "poste": ("RH", "EMPLOYEE"),
+        "manager_matricule": "EMP-003",
+        "salaire_base": Decimal("1550000"),
+        "type_contrat": TypeContrat.CDI.value,
+        "nombre_enfants": 2,
+        "nom_conjoint": "Sonia Nkongolo",
+    },
+    {
+        "matricule": "EMP-016",
+        "prenom": "Laurence",
+        "nom": "Mpiana",
+        "email": "laurence.mpiana@example.com",
+        "sexe": Sexe.FEMININ.value,
+        "statut_matrimonial": StatutMatrimonial.DIVORCE.value,
+        "date_naissance": date(1984, 7, 11),
+        "date_embauche": date(2015, 11, 9),
+        "poste": ("RH", "EMPLOYEE"),
+        "manager_matricule": "EMP-003",
+        "salaire_base": Decimal("1650000"),
+        "type_contrat": TypeContrat.CDI.value,
+        "nombre_enfants": 1,
+    },
+    {
+        "matricule": "EMP-017",
+        "prenom": "Kevin",
+        "nom": "Ngandu",
+        "email": "kevin.ngandu@example.com",
+        "sexe": Sexe.MASCULIN.value,
+        "statut_matrimonial": StatutMatrimonial.CELIBATAIRE.value,
+        "date_naissance": date(1999, 10, 17),
+        "date_embauche": date(2024, 6, 3),
+        "poste": ("OPS", "EMPLOYEE"),
+        "manager_matricule": "EMP-006",
+        "salaire_base": Decimal("1150000"),
+        "type_contrat": TypeContrat.STAGE.value,
+    },
+    {
+        "matricule": "EMP-018",
+        "prenom": "Claudine",
+        "nom": "Yav",
+        "email": "claudine.yav@example.com",
+        "sexe": Sexe.FEMININ.value,
+        "statut_matrimonial": StatutMatrimonial.VEUF.value,
+        "date_naissance": date(1982, 12, 30),
+        "date_embauche": date(2014, 2, 1),
+        "poste": ("FIN", "EMPLOYEE"),
+        "manager_matricule": "EMP-005",
+        "salaire_base": Decimal("1800000"),
+        "type_contrat": TypeContrat.CDI.value,
+        "nombre_enfants": 3,
+    },
 ]
+
+
+MATRICULES: list[str] = [e["matricule"] for e in EMPLOYEES]
+EMAILS: list[str] = [e["email"] for e in EMPLOYEES]
 
 
 # ---------------------------------------------------------------------------
@@ -236,9 +413,10 @@ EMPLOYEES: list[dict[str, Any]] = [
 # ---------------------------------------------------------------------------
 
 
-def _employee_common(payload: dict[str, Any]) -> dict[str, Any]:
-    """Fill the mandatory employee fields that are the same for every row."""
+def _employee_defaults(payload: dict[str, Any]) -> dict[str, Any]:
+    """Fields with sensible mock defaults shared by every employee."""
     return {
+        "nationalite": "Congolaise",
         "banque": "Rawbank",
         "numero_compte": f"RAW-{payload['matricule']}",
         "niveau_etude": "Licence",
@@ -259,8 +437,8 @@ def _employee_common(payload: dict[str, Any]) -> dict[str, Any]:
 async def _get_or_create_service(
     db: AsyncSession, payload: dict[str, str]
 ) -> Service:
-    result = await db.execute(select(Service).where(Service.code == payload["code"]))
-    existing = result.scalar_one_or_none()
+    stmt = select(Service).where(Service.code == payload["code"])
+    existing = (await db.execute(stmt)).scalar_one_or_none()
     if existing is not None:
         return existing
     svc = Service(code=payload["code"], titre=payload["titre"])
@@ -270,8 +448,8 @@ async def _get_or_create_service(
 
 
 async def _get_or_create_group(db: AsyncSession, payload: dict[str, str]) -> Group:
-    result = await db.execute(select(Group).where(Group.code == payload["code"]))
-    existing = result.scalar_one_or_none()
+    stmt = select(Group).where(Group.code == payload["code"])
+    existing = (await db.execute(stmt)).scalar_one_or_none()
     if existing is not None:
         return existing
     grp = Group(code=payload["code"], name=payload["name"])
@@ -304,18 +482,17 @@ async def _get_or_create_employe(
     if existing is not None:
         return existing
     employe = Employe(
+        matricule=payload["matricule"],
         prenom=payload["prenom"],
         nom=payload["nom"],
         postnom=payload.get("postnom"),
-        matricule=payload["matricule"],
         date_naissance=payload["date_naissance"],
         sexe=payload["sexe"],
         statut_matrimonial=payload["statut_matrimonial"],
-        nationalite=payload["nationalite"],
-        email_personnel=payload["email_personnel"],
+        email_personnel=payload["email"],
         date_embauche=payload["date_embauche"],
         poste_id=poste_id,
-        **_employee_common(payload),
+        **_employee_defaults(payload),
     )
     db.add(employe)
     await db.flush()
@@ -325,12 +502,12 @@ async def _get_or_create_employe(
 async def _get_or_create_user(
     db: AsyncSession, employe: Employe, payload: dict[str, Any]
 ) -> User:
-    stmt = select(User).where(User.email == payload["email_personnel"])
+    stmt = select(User).where(User.email == payload["email"])
     existing = (await db.execute(stmt)).scalar_one_or_none()
     if existing is not None:
         return existing
     user = User(
-        email=payload["email_personnel"],
+        email=payload["email"],
         password=get_password_hash(DEFAULT_PASSWORD),
         nom=payload["nom"],
         prenom=payload["prenom"],
@@ -423,49 +600,107 @@ async def _seed_soldes(db: AsyncSession, employes: list[Employe]) -> None:
     await db.flush()
 
 
-async def _seed_demandes(db: AsyncSession, employes: list[Employe]) -> None:
-    """Ajoute 2 demandes de congé en attente sur 2 employés différents."""
-    if len(employes) < 2:
-        return
+async def _statut_by_code(db: AsyncSession, code: str) -> StatutProcessus | None:
+    stmt = select(StatutProcessus).where(StatutProcessus.code_statut == code)
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _etape_conge(db: AsyncSession, ordre: int) -> EtapeProcessus | None:
+    stmt = (
+        select(EtapeProcessus)
+        .where(EtapeProcessus.code_processus == CodeProcessus.CONGE.value)
+        .where(EtapeProcessus.ordre == ordre)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _etape_paie(db: AsyncSession, ordre: int) -> EtapeProcessus | None:
+    stmt = (
+        select(EtapeProcessus)
+        .where(EtapeProcessus.code_processus == CodeProcessusPaie.PAIE.value)
+        .where(EtapeProcessus.ordre == ordre)
+    )
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def _seed_demandes(
+    db: AsyncSession, employes_by_mat: dict[str, Employe]
+) -> None:
+    """5 demandes couvrant les 5 statuts globaux du workflow conge."""
     type_ca = (
         await db.execute(select(TypeConge).where(TypeConge.code == "CA"))
     ).scalar_one_or_none()
-    if type_ca is None:
-        return
-    etape = (
-        await db.execute(
-            select(EtapeProcessus)
-            .where(EtapeProcessus.code_processus == CodeProcessus.CONGE.value)
-            .where(EtapeProcessus.ordre == 1)
-        )
+    type_cm = (
+        await db.execute(select(TypeConge).where(TypeConge.code == "CM"))
     ).scalar_one_or_none()
-    statut_en_attente = (
-        await db.execute(
-            select(StatutProcessus).where(
-                StatutProcessus.code_statut == CodeStatut.EN_ATTENTE.value
-            )
-        )
-    ).scalar_one_or_none()
-    if etape is None or statut_en_attente is None:
+    if type_ca is None or type_cm is None:
         return
 
+    etape1 = await _etape_conge(db, 1)
+    etape2 = await _etape_conge(db, 2)
+    st_attente = await _statut_by_code(db, CodeStatut.EN_ATTENTE.value)
+    st_cours = await _statut_by_code(db, CodeStatut.EN_COURS.value)
+    st_valide = await _statut_by_code(db, CodeStatut.VALIDE.value)
+    st_rejete = await _statut_by_code(db, CodeStatut.REJETE.value)
+    st_annule = await _statut_by_code(db, CodeStatut.ANNULE.value)
+
+    if not all([etape1, etape2, st_attente, st_cours, st_valide, st_rejete, st_annule]):
+        return
+
+    now = datetime.utcnow()
     samples = [
         {
-            "employe": employes[1],
+            "employe": employes_by_mat["EMP-008"],
+            "type_conge_id": type_ca.id,
             "start_offset": 30,
             "duration": 5,
+            "etape": etape1,
+            "statut": st_attente,
+            "decision_date": None,
         },
         {
-            "employe": employes[4] if len(employes) > 4 else employes[2],
-            "start_offset": 45,
+            "employe": employes_by_mat["EMP-009"],
+            "type_conge_id": type_cm.id,
+            "start_offset": 15,
             "duration": 3,
+            "etape": etape2,
+            "statut": st_cours,
+            "decision_date": None,
+        },
+        {
+            "employe": employes_by_mat["EMP-011"],
+            "type_conge_id": type_ca.id,
+            "start_offset": -30,
+            "duration": 4,
+            "etape": etape2,
+            "statut": st_valide,
+            "decision_date": now - timedelta(days=40),
+        },
+        {
+            "employe": employes_by_mat["EMP-013"],
+            "type_conge_id": type_ca.id,
+            "start_offset": 60,
+            "duration": 10,
+            "etape": etape2,
+            "statut": st_rejete,
+            "decision_date": now - timedelta(days=2),
+        },
+        {
+            "employe": employes_by_mat["EMP-014"],
+            "type_conge_id": type_cm.id,
+            "start_offset": 45,
+            "duration": 2,
+            "etape": etape1,
+            "statut": st_annule,
+            "decision_date": now - timedelta(days=1),
         },
     ]
     for sample in samples:
+        employe: Employe = sample["employe"]
         debut = date.today() + timedelta(days=sample["start_offset"])
         fin = debut + timedelta(days=sample["duration"] - 1)
         stmt = select(DemandeConge).where(
-            DemandeConge.employe_id == sample["employe"].id,
+            DemandeConge.employe_id == employe.id,
             DemandeConge.date_debut == debut,
             DemandeConge.date_fin == fin,
         )
@@ -473,14 +708,16 @@ async def _seed_demandes(db: AsyncSession, employes: list[Employe]) -> None:
             continue
         db.add(
             DemandeConge(
-                employe_id=sample["employe"].id,
-                type_conge_id=type_ca.id,
+                employe_id=employe.id,
+                type_conge_id=sample["type_conge_id"],
                 date_debut=debut,
                 date_fin=fin,
                 nb_jours_ouvres=float(sample["duration"]),
-                etape_courante_id=etape.id,
-                statut_global_id=statut_en_attente.id,
-                date_soumission=datetime.utcnow(),
+                etape_courante_id=sample["etape"].id,
+                responsable_id=employe.responsable_id,
+                statut_global_id=sample["statut"].id,
+                date_soumission=now - timedelta(days=sample["duration"] * 2),
+                date_decision_finale=sample["decision_date"],
             )
         )
     await db.flush()
@@ -491,30 +728,9 @@ async def _seed_demandes(db: AsyncSession, employes: list[Employe]) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _seed_periode_with_entrees(
-    db: AsyncSession, employes: list[Employe], annee: int, mois: int
-) -> PeriodePaie:
-    stmt = select(PeriodePaie).where(
-        PeriodePaie.annee == annee, PeriodePaie.mois == mois
-    )
-    periode = (await db.execute(stmt)).scalar_one_or_none()
-    if periode is None:
-        date_debut = date(annee, mois, 1)
-        if mois == 12:
-            date_fin = date(annee, 12, 31)
-        else:
-            date_fin = date(annee, mois + 1, 1) - timedelta(days=1)
-        periode = PeriodePaie(
-            annee=annee,
-            mois=mois,
-            date_debut=date_debut,
-            date_fin=date_fin,
-            statut=PeriodeStatutTexte.DRAFT.value,
-        )
-        db.add(periode)
-        await db.flush()
-
-    # Build one entree per active contract (idempotent on UNIQUE(employe,periode)).
+async def _seed_entrees_for_periode(
+    db: AsyncSession, periode: PeriodePaie, employes: list[Employe]
+) -> None:
     for employe in employes:
         contrat = (
             await db.execute(
@@ -525,15 +741,11 @@ async def _seed_periode_with_entrees(
         ).scalar_one_or_none()
         if contrat is None:
             continue
-        exists = (
-            await db.execute(
-                select(EntreePaie).where(
-                    EntreePaie.employe_id == employe.id,
-                    EntreePaie.periode_paie_id == periode.id,
-                )
-            )
-        ).scalar_one_or_none()
-        if exists is not None:
+        stmt = select(EntreePaie).where(
+            EntreePaie.employe_id == employe.id,
+            EntreePaie.periode_paie_id == periode.id,
+        )
+        if (await db.execute(stmt)).scalar_one_or_none():
             continue
         salaire_brut = (
             contrat.salaire_base
@@ -547,7 +759,10 @@ async def _seed_periode_with_entrees(
             EntreePaie(
                 employe_id=employe.id,
                 periode_paie_id=periode.id,
-                contrat_reference={"contrat_id": contrat.id, "salaire_base": str(contrat.salaire_base)},
+                contrat_reference={
+                    "contrat_id": contrat.id,
+                    "salaire_base": str(contrat.salaire_base),
+                },
                 salaire_base=contrat.salaire_base,
                 indemnite_logement=contrat.indemnite_logement,
                 indemnite_deplacement=contrat.indemnite_transport,
@@ -568,12 +783,54 @@ async def _seed_periode_with_entrees(
             )
         )
     await db.flush()
+
+
+async def _seed_periode(
+    db: AsyncSession,
+    annee: int,
+    mois: int,
+    statut_texte: str,
+    etape_ordre: int | None,
+    statut_code: str | None,
+    date_soumission: datetime | None,
+    date_decision_finale: datetime | None,
+) -> PeriodePaie:
+    stmt = select(PeriodePaie).where(
+        PeriodePaie.annee == annee, PeriodePaie.mois == mois
+    )
+    periode = (await db.execute(stmt)).scalar_one_or_none()
+    if periode is not None:
+        return periode
+    date_debut = date(annee, mois, 1)
+    if mois == 12:
+        date_fin = date(annee, 12, 31)
+    else:
+        date_fin = date(annee, mois + 1, 1) - timedelta(days=1)
+    periode = PeriodePaie(
+        annee=annee,
+        mois=mois,
+        date_debut=date_debut,
+        date_fin=date_fin,
+        statut=statut_texte,
+        date_soumission=date_soumission,
+        date_decision_finale=date_decision_finale,
+    )
+    if etape_ordre is not None:
+        etape = await _etape_paie(db, etape_ordre)
+        if etape is not None:
+            periode.etape_courante_id = etape.id
+    if statut_code is not None:
+        statut = await _statut_by_code(db, statut_code)
+        if statut is not None:
+            periode.statut_global_id = statut.id
+    db.add(periode)
+    await db.flush()
     return periode
 
 
 async def _seed_retenues(db: AsyncSession, employes: list[Employe]) -> None:
-    """Ajoute une retenue type 'avance' sur 2 employés."""
-    for employe in employes[:2]:
+    """Ajoute une retenue 'avance' sur 3 employés (idempotent par (employe, type))."""
+    for employe in employes[:3]:
         stmt = select(RetenueEmploye).where(
             RetenueEmploye.employe_id == employe.id,
             RetenueEmploye.type_retenue == DeductionType.AVANCE_SALAIRE.value,
@@ -596,22 +853,34 @@ async def _seed_retenues(db: AsyncSession, employes: list[Employe]) -> None:
     await db.flush()
 
 
-async def _seed_alerts(db: AsyncSession, periode: PeriodePaie) -> None:
+async def _seed_alerts(db: AsyncSession, periodes: list[PeriodePaie]) -> None:
+    if not periodes:
+        return
     samples = [
         {
+            "periode": periodes[0],
             "alert_type": AlertType.VALIDATION_ERROR.value,
             "severity": AlertSeverity.HIGH.value,
             "title": "Valeurs de cotisations manquantes",
             "message": "Vérifier les cotisations patronales de la période.",
         },
         {
+            "periode": periodes[0],
             "alert_type": AlertType.OTHER.value,
             "severity": AlertSeverity.LOW.value,
             "title": "Rappel — clôture de période",
             "message": "Cette période de paie doit être clôturée avant la fin du mois.",
         },
+        {
+            "periode": periodes[-1] if len(periodes) > 1 else periodes[0],
+            "alert_type": AlertType.CALCULATION_ERROR.value,
+            "severity": AlertSeverity.CRITICAL.value,
+            "title": "Incohérence sur le net à payer",
+            "message": "Écart significatif détecté entre l'ancien calcul et le nouveau.",
+        },
     ]
     for sample in samples:
+        periode = sample.pop("periode")
         stmt = select(Alert).where(
             Alert.periode_paie_id == periode.id,
             Alert.title == sample["title"],
@@ -635,15 +904,11 @@ async def _seed_alerts(db: AsyncSession, periode: PeriodePaie) -> None:
 
 
 async def _reset_mock_data(db: AsyncSession, verbose: bool) -> None:
-    matricules = [p["matricule"] for p in EMPLOYEES]
-    emails = [p["email_personnel"] for p in EMPLOYEES]
-
-    # Pull IDs first so we can cascade-delete cleanly.
     employe_ids = [
         row[0]
         for row in (
             await db.execute(
-                select(Employe.id).where(Employe.matricule.in_(matricules))
+                select(Employe.id).where(Employe.matricule.in_(MATRICULES))
             )
         ).all()
     ]
@@ -651,7 +916,6 @@ async def _reset_mock_data(db: AsyncSession, verbose: bool) -> None:
         print(f"  • removing mock data for {len(employe_ids)} employe(s)")
 
     if employe_ids:
-        # Paie-related rows first (FKs point to employe & periode)
         await db.execute(
             delete(EntreePaie).where(EntreePaie.employe_id.in_(employe_ids))
         )
@@ -661,26 +925,28 @@ async def _reset_mock_data(db: AsyncSession, verbose: bool) -> None:
         await db.execute(
             delete(Alert).where(Alert.employe_id.in_(employe_ids))
         )
-        # Conge-related
         await db.execute(
             delete(DemandeConge).where(DemandeConge.employe_id.in_(employe_ids))
         )
         await db.execute(
             delete(SoldeConge).where(SoldeConge.employe_id.in_(employe_ids))
         )
-        # User account + employe + contrat (contrat cascades from employe)
-        await db.execute(delete(User).where(User.email.in_(emails)))
+        await db.execute(delete(User).where(User.email.in_(EMAILS)))
         await db.execute(delete(Employe).where(Employe.id.in_(employe_ids)))
 
-    # Periode de paie seed (year/month pair used below)
     today = date.today()
+    prev_year, prev_month = _prev_month(today.year, today.month)
     await db.execute(
         delete(PeriodePaie).where(
-            PeriodePaie.annee == today.year,
-            PeriodePaie.mois == today.month,
+            PeriodePaie.annee.in_([today.year, prev_year]),
+            PeriodePaie.mois.in_([today.month, prev_month]),
         )
     )
     await db.commit()
+
+
+def _prev_month(annee: int, mois: int) -> tuple[int, int]:
+    return (annee - 1, 12) if mois == 1 else (annee, mois - 1)
 
 
 # ---------------------------------------------------------------------------
@@ -715,47 +981,84 @@ async def seed(reset: bool = False, verbose: bool = True) -> None:
 
         # 3. Employees + users + contrats
         log(f"👤 Seeding {len(EMPLOYEES)} employees + user accounts...")
-        employes: list[Employe] = []
+        employes_by_mat: dict[str, Employe] = {}
         for payload in EMPLOYEES:
             poste = postes[payload["poste"]]
             employe = await _get_or_create_employe(db, payload, poste.id)
             user = await _get_or_create_user(db, employe, payload)
             await _get_or_create_contrat(db, employe, payload)
-            # Attach user to the group implied by its poste.
             _, grp_code = payload["poste"]
             await _link_user_to_group(db, user.id, groups[grp_code])
-            employes.append(employe)
-
-        # Commit employees before setting responsables, so FKs resolve.
+            employes_by_mat[payload["matricule"]] = employe
         await db.commit()
 
-        # 4. Hierarchy: first employee becomes the manager of every other
-        if employes:
-            boss = employes[0]
-            for subordinate in employes[1:]:
-                if subordinate.responsable_id is None:
-                    subordinate.responsable_id = boss.id
-            await db.commit()
+        # 4. Resolve responsable_id once every employee has been committed.
+        for payload in EMPLOYEES:
+            manager_mat = payload.get("manager_matricule")
+            if manager_mat is None:
+                continue
+            employe = employes_by_mat[payload["matricule"]]
+            manager = employes_by_mat[manager_mat]
+            if employe.responsable_id != manager.id:
+                employe.responsable_id = manager.id
+        await db.commit()
 
-        # 5. Conge seed data
-        log("🏖️  Seeding conge soldes + sample demandes...")
+        employes = list(employes_by_mat.values())
+
+        # 5. Conge seed data (soldes + 5 demandes covering every statut)
+        log("🏖️  Seeding conge soldes + sample demandes (5 statuts)...")
         await _seed_soldes(db, employes)
-        await _seed_demandes(db, employes)
+        await _seed_demandes(db, employes_by_mat)
         await db.commit()
 
-        # 6. Paie seed data
+        # 6. Paie seed data — 2 periodes
         today = date.today()
-        log(f"💰 Seeding paie periode {today.year}-{today.month:02d}...")
-        periode = await _seed_periode_with_entrees(
-            db, employes, today.year, today.month
+        prev_year, prev_month = _prev_month(today.year, today.month)
+        now = datetime.utcnow()
+
+        log(
+            f"💰 Seeding paie periodes "
+            f"{prev_year}-{prev_month:02d} (PAID) + {today.year}-{today.month:02d} (DRAFT)..."
         )
+        # Previous month — full workflow completed
+        periode_prev = await _seed_periode(
+            db,
+            annee=prev_year,
+            mois=prev_month,
+            statut_texte=PeriodeStatutTexte.PAID.value,
+            etape_ordre=4,  # Paiement
+            statut_code=CodeStatutPaie.PAYE.value,
+            date_soumission=now - timedelta(days=30),
+            date_decision_finale=now - timedelta(days=5),
+        )
+        await _seed_entrees_for_periode(db, periode_prev, employes)
+
+        # Current month — brand-new DRAFT
+        periode_now = await _seed_periode(
+            db,
+            annee=today.year,
+            mois=today.month,
+            statut_texte=PeriodeStatutTexte.DRAFT.value,
+            etape_ordre=1,  # Calcul RH
+            statut_code=CodeStatutPaie.EN_ATTENTE.value,
+            date_soumission=None,
+            date_decision_finale=None,
+        )
+        await _seed_entrees_for_periode(db, periode_now, employes)
+
         await _seed_retenues(db, employes)
-        await _seed_alerts(db, periode)
+        await _seed_alerts(db, [periode_now, periode_prev])
         await db.commit()
 
         log("\n✅ Mock data seeding complete.")
-        log(f"   - {len(employes)} employees / users (password: {DEFAULT_PASSWORD!r})")
-        log(f"   - period de paie {periode.annee}-{periode.mois:02d} ({len(employes)} entrees)")
+        log(
+            f"   - {len(employes)} employees / users (password: {DEFAULT_PASSWORD!r})"
+        )
+        log(
+            f"   - paie periodes: {prev_year}-{prev_month:02d} (PAID) "
+            f"and {today.year}-{today.month:02d} (DRAFT)"
+        )
+        log("   - conge demandes covering EN_ATTENTE / EN_COURS / VALIDE / REJETE / ANNULE")
 
 
 def main() -> None:
