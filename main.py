@@ -65,11 +65,10 @@ app.include_router(audit_router, prefix="/api")
 app.include_router(password_reset_router)
 app.include_router(conge_router)
 
-# Mount local uploads directory only when using local storage backend
-if settings.STORAGE_BACKEND.lower() == "local":
-    uploads_dir = Path("uploads")
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Mount the uploads directory so saved files are served at /uploads/*
+uploads_dir = Path("uploads")
+uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 @app.get("/")

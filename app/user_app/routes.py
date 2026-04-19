@@ -841,7 +841,7 @@ async def create_complete_employee(
 
                 try:
                     file_content = await file.read()
-                    # Upload via active storage backend (local or supabase)
+                    # Persist the uploaded file on the local filesystem
                     public_url = storage.upload_file(
                         file_content=file_content,
                         original_filename=file.filename,

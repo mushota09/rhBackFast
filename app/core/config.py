@@ -54,14 +54,6 @@ class Settings(BaseSettings):
     # Initialize default PAIE workflow (statuses, steps, actions) at startup.
     PAIE_INIT_DEFAULTS: bool = True
 
-    # SUPABASE
-
-    SUPABASE_URL: str = "https://ylyspjvzsgcekuaywuot.supabase.co"
-    SUPABASE_KEY: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlseXNwanZ6c2djZWt1YXl3dW90Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3NDEzMjgsImV4cCI6MjA4OTMxNzMyOH0.cBAehGPPgXvfgnLPsNsLDrybktzA8_hbqSrrsKkvApU"
-    SUPABASE_BUCKET_NAME: str = "uploads"
-    # Storage backend: "local" (filesystem) or "supabase"
-    STORAGE_BACKEND: str = "supabase"
-
     # Email/SMTP Configuration
 
     SMTP_HOST: str = "smtp.gmail.com"
