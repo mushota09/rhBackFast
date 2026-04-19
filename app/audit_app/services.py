@@ -75,6 +75,13 @@ class AuditService:
                 user_agent = request.headers.get("user-agent", "")
                 request_method = request.method
                 request_path = str(request.url.path)
+                # Signal to AuditMiddleware that this request has already
+                # been audited manually, so it must skip its own background
+                # log and avoid producing a duplicate entry.
+                try:
+                    request.state.audit_logged = True
+                except Exception:
+                    pass
 
             # Create audit log entry
             audit_log = AuditLog(
