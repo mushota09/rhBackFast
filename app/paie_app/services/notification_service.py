@@ -301,6 +301,9 @@ class NotificationService:
 
             result = await self.db.execute(select(PeriodePaie).where(PeriodePaie.id == entree.periode_paie_id))
             periode = result.scalar_one_or_none()
+            if not periode:
+                logger.warning(f'Period {entree.periode_paie_id} not found for payslip notification')
+                return False
 
             subject = f'Your Payslip - {periode.mois}/{periode.annee}'
             body_lines = [

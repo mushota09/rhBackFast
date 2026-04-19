@@ -1,5 +1,6 @@
 """User management models"""
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 from sqlalchemy import (
     String, Integer, Boolean, DateTime, Date, Text,
@@ -362,19 +363,19 @@ class Contrat(BaseModel):
     date_fin: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
 
     # Salary components
-    salaire_base: Mapped[Numeric] = mapped_column(Numeric(12, 2))
-    indemnite_logement: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    indemnite_transport: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    indemnite_deplacement: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    indemnite_fonction: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    prime_fonction: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    autre_avantage: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
+    salaire_base: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    indemnite_logement: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    indemnite_transport: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    indemnite_deplacement: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    indemnite_fonction: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    prime_fonction: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    autre_avantage: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
 
     # Social contributions
-    assurance_patronale: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    assurance_salariale: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    fpc_patronale: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
-    fpc_salariale: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0)
+    assurance_patronale: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    assurance_salariale: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    fpc_patronale: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    fpc_salariale: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
 
     devise: Mapped[str] = mapped_column(String(3), default="USD")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

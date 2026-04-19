@@ -343,7 +343,7 @@ async def calculate_entree(
     entree_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("entree", "update")),
-    request: Request = None
+    request: Optional[Request] = None
 ):
     """Recalculate a payroll entry"""
     result = await db.execute(
@@ -387,7 +387,7 @@ payroll_router = APIRouter(prefix="/payroll", tags=["Payroll"])
 async def export_periode(
     periode_id: int,
     export_format: str = Query("excel", pattern="^(excel|csv)$"),
-    request: Request = None,
+    request: Optional[Request] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("payroll", "view"))
 ):
@@ -429,7 +429,7 @@ async def export_periode(
 @payroll_router.get("/export/all-periodes")
 async def export_all_periodes(
     annee: Optional[int] = Query(None),
-    request: Request = None,
+    request: Optional[Request] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("payroll", "view"))
 ):
@@ -465,7 +465,7 @@ async def export_all_periodes(
 @payroll_router.get("/export/retenues")
 async def export_retenues(
     employe_id: Optional[int] = Query(None),
-    request: Request = None,
+    request: Optional[Request] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("payroll", "view"))
 ):
@@ -501,7 +501,7 @@ async def export_retenues(
 @payroll_router.get("/export")
 async def export_payroll(
     export_format: str = Query("excel", pattern="^(excel|csv|json)$"),
-    request: Request = None,
+    request: Optional[Request] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("payroll", "view"))
 ):

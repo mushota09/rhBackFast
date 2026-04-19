@@ -3,7 +3,7 @@ import csv
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -87,17 +87,17 @@ class ExportService:
         self,
         workbook: xlsxwriter.Workbook,
         periode: PeriodePaie,
-        header_format: xlsxwriter.format.Format,
-        currency_format: xlsxwriter.format.Format
+        header_format: Any,
+        currency_format: Any
     ):
         """Create summary worksheet"""
         worksheet = workbook.add_worksheet("Résumé")
-        worksheet.set_column('A:A', 30)
-        worksheet.set_column('B:B', 20)
+        worksheet.set_column(0, 0, 30)
+        worksheet.set_column(1, 1, 20)
 
         # Period information
-        worksheet.write('A1', 'Période de Paie', header_format)
-        worksheet.write('B1', f"{periode.mois:02d}/{periode.annee}", header_format)
+        worksheet.write(0, 0, 'Période de Paie', header_format)
+        worksheet.write(0, 1, f"{periode.mois:02d}/{periode.annee}", header_format)
 
         row = 2
         summary_data = [
@@ -124,8 +124,8 @@ class ExportService:
         self,
         workbook: xlsxwriter.Workbook,
         periode: PeriodePaie,
-        header_format: xlsxwriter.format.Format,
-        currency_format: xlsxwriter.format.Format
+        header_format: Any,
+        currency_format: Any
     ):
         """Create detailed entries worksheet"""
         worksheet = workbook.add_worksheet("Détails Paie")
@@ -193,18 +193,18 @@ class ExportService:
             row += 1
 
         # Auto-fit columns
-        worksheet.set_column('A:A', 8)
-        worksheet.set_column('B:B', 25)
-        worksheet.set_column('C:C', 15)
-        worksheet.set_column('D:O', 15)
+        worksheet.set_column(0, 0, 8)
+        worksheet.set_column(1, 1, 25)
+        worksheet.set_column(2, 2, 15)
+        worksheet.set_column(3, 14, 15)
 
     async def _create_deductions_sheet(
         self,
         workbook: xlsxwriter.Workbook,
         periode: PeriodePaie,
-        header_format: xlsxwriter.format.Format,
-        currency_format: xlsxwriter.format.Format,
-        date_format: xlsxwriter.format.Format
+        header_format: Any,
+        currency_format: Any,
+        date_format: Any
     ):
         """Create deductions worksheet"""
         worksheet = workbook.add_worksheet("Retenues")
@@ -267,13 +267,13 @@ class ExportService:
             row += 1
 
         # Auto-fit columns
-        worksheet.set_column('A:A', 8)
-        worksheet.set_column('B:B', 25)
-        worksheet.set_column('C:C', 15)
-        worksheet.set_column('D:D', 30)
-        worksheet.set_column('E:H', 15)
-        worksheet.set_column('I:J', 12)
-        worksheet.set_column('K:L', 10)
+        worksheet.set_column(0, 0, 8)
+        worksheet.set_column(1, 1, 25)
+        worksheet.set_column(2, 2, 15)
+        worksheet.set_column(3, 3, 30)
+        worksheet.set_column(4, 7, 15)
+        worksheet.set_column(8, 9, 12)
+        worksheet.set_column(10, 11, 10)
 
     async def export_periode_to_csv(
         self,
@@ -458,11 +458,11 @@ class ExportService:
             row += 1
 
         # Auto-fit columns
-        worksheet.set_column('A:A', 8)
-        worksheet.set_column('B:C', 10)
-        worksheet.set_column('D:D', 12)
-        worksheet.set_column('E:E', 15)
-        worksheet.set_column('F:I', 20)
+        worksheet.set_column(0, 0, 8)
+        worksheet.set_column(1, 2, 10)
+        worksheet.set_column(3, 3, 12)
+        worksheet.set_column(4, 4, 15)
+        worksheet.set_column(5, 8, 20)
 
         workbook.close()
         return output_path
