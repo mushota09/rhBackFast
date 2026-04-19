@@ -8,6 +8,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, INET
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.audit_app.constants import (
+    ANONYMOUS_USER_DISPLAY,
+    FAILED_ACTION_SUFFIX,
+    AuditAction,
+)
 from app.core.database import Base
 
 if TYPE_CHECKING:
@@ -77,15 +82,11 @@ class AuditLog(Base):
 
     # Table constraints and indexes
     __table_args__ = (
-        # Check constraint for valid actions
+        # CHECK constraint listing every valid AuditAction value.
+        # The expression is built from the AuditAction enum so that the DB
+        # constraint stays in sync with the Python-level source of truth.
         CheckConstraint(
-            "action IN ("
-            "'CREATE', 'UPDATE', 'DELETE', "
-            "'LOGIN', 'LOGOUT', 'LOGIN_FAILED', "
-            "'VIEW', 'VIEW_FAILED', "
-            "'EXPORT', 'BULK_OPERATION', "
-            "'CREATE_FAILED', 'UPDATE_FAILED', 'DELETE_FAILED'"
-            ")",
+            AuditAction.check_constraint_expression(),
             name="ck_audit_action"
         ),
         # Indexes for common queries
@@ -103,14 +104,14 @@ class AuditLog(Base):
     @property
     def is_failed_action(self) -> bool:
         """Check if the action failed"""
-        return self.action.endswith('_FAILED')
+        return self.action.endswith(FAILED_ACTION_SUFFIX)
 
     @property
     def user_display(self) -> str:
         """Get formatted user display name"""
         if self.user:
             return f"{self.user.nom} {self.user.prenom} ({self.user.email})"
-        return "Anonymous"
+        return ANONYMOUS_USER_DISPLAY
 
     def __str__(self) -> str:
         user_str = self.user_display

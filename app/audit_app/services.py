@@ -4,6 +4,11 @@ from typing import Optional, Any
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit_app.constants import (
+    AuditAction,
+    AuditRequestState,
+    AuditResourceType,
+)
 from app.audit_app.models import AuditLog
 from app.user_app.models import User
 
@@ -79,7 +84,7 @@ class AuditService:
                 # been audited manually, so it must skip its own background
                 # log and avoid producing a duplicate entry.
                 try:
-                    request.state.audit_logged = True
+                    setattr(request.state, AuditRequestState.AUDIT_LOGGED, True)
                 except Exception:
                     pass
 
@@ -87,7 +92,7 @@ class AuditService:
             audit_log = AuditLog(
                 user_id=user.id if user else None,
                 action=action or "UNKNOWN",
-                resource_type=resource_type or "unknown",
+                resource_type=resource_type or AuditResourceType.UNKNOWN.value,
                 resource_id=resource_id,
                 old_values=old_values,
                 new_values=new_values,
@@ -132,13 +137,13 @@ class AuditService:
         Returns:
             AuditLog instance if successful, None if failed
         """
-        action = "LOGIN" if success else "LOGIN_FAILED"
+        action = AuditAction.LOGIN.value if success else AuditAction.LOGIN_FAILED.value
 
         return await AuditService.log_action(
             db=db,
             user=user if success else None,
             action=action,
-            resource_type="authentication",
+            resource_type=AuditResourceType.AUTHENTICATION.value,
             resource_id=str(user.id) if user else None,
             request=request,
             response_status=200 if success else 401
@@ -164,8 +169,8 @@ class AuditService:
         return await AuditService.log_action(
             db=db,
             user=user,
-            action="LOGOUT",
-            resource_type="authentication",
+            action=AuditAction.LOGOUT.value,
+            resource_type=AuditResourceType.AUTHENTICATION.value,
             resource_id=str(user.id),
             request=request,
             response_status=200
@@ -198,7 +203,7 @@ class AuditService:
         new_values = AuditService._extract_model_values(instance)
 
         # Get resource type from table name
-        resource_type = "unknown"
+        resource_type = AuditResourceType.UNKNOWN.value
         if hasattr(instance, '__tablename__'):
             resource_type = instance.__tablename__
 
@@ -224,7 +229,7 @@ class AuditService:
         user: User,
         resource_type: str,
         count: int,
-        action: str = "BULK_OPERATION",
+        action: str = AuditAction.BULK_OPERATION.value,
         request: Optional[Request] = None
     ) -> Optional[AuditLog]:
         """
@@ -282,7 +287,7 @@ class AuditService:
         return await AuditService.log_action(
             db=db,
             user=user,
-            action="EXPORT",
+            action=AuditAction.EXPORT.value,
             resource_type=resource_type,
             resource_id=f"export_{format_type}",
             new_values=export_data,
@@ -315,7 +320,7 @@ class AuditService:
         return await AuditService.log_action(
             db=db,
             user=user,
-            action="VIEW",
+            action=AuditAction.VIEW.value,
             resource_type=resource_type,
             resource_id=resource_id,
             request=request

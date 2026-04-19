@@ -19,6 +19,7 @@ from app.core.permissions import require_permission
 from app.user_app import schemas
 from app.user_app.models import Service, Group, ServiceGroup, User, Employe, Permission, GroupPermission, UserGroup, Contrat, Document
 from app.user_app.services import EmployeeService, GroupService, PermissionService
+from app.audit_app.constants import AuditAction, AuditResourceType
 from app.audit_app.services import AuditService
 
 router = APIRouter()
@@ -729,7 +730,7 @@ async def create_employee(
             db=db,
             user=current_user,
             instance=db_employee,
-            action="CREATE",
+            action=AuditAction.CREATE.value,
             request=request
         )
 
@@ -950,7 +951,7 @@ async def update_employee(
         db=db,
         user=current_user,
         instance=employee,
-        action="UPDATE",
+        action=AuditAction.UPDATE.value,
         old_values=old_values,
         request=request
     )
@@ -984,8 +985,8 @@ async def delete_employee(
     await AuditService.log_action(
         db=db,
         user=current_user,
-        action="DELETE",
-        resource_type="employe",
+        action=AuditAction.DELETE.value,
+        resource_type=AuditResourceType.EMPLOYE.value,
         resource_id=str(employee_id),
         old_values=old_values,
         request=request
@@ -1014,7 +1015,7 @@ async def export_employees(
     await AuditService.log_export(
         db=db,
         user=current_user,
-        resource_type="employe",
+        resource_type=AuditResourceType.EMPLOYE.value,
         format_type=format,
         count=len(employees),
         request=request
@@ -1573,7 +1574,7 @@ async def create_user(
         db=db,
         user=current_user,
         instance=db_user,
-        action="CREATE",
+        action=AuditAction.CREATE.value,
         request=request
     )
 
@@ -1641,7 +1642,7 @@ async def update_user(
         db=db,
         user=current_user,
         instance=user,
-        action="UPDATE",
+        action=AuditAction.UPDATE.value,
         old_values=old_values,
         request=request
     )
@@ -1674,8 +1675,8 @@ async def delete_user(
     await AuditService.log_action(
         db=db,
         user=current_user,
-        action="DELETE",
-        resource_type="user_management_user",
+        action=AuditAction.DELETE.value,
+        resource_type=AuditResourceType.USER.value,
         resource_id=str(user_id),
         old_values=old_values,
         request=request

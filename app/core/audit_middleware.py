@@ -6,6 +6,14 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.background import BackgroundTask
 
+from app.audit_app.constants import (
+    AUDIT_SKIP_PATH_PREFIXES,
+    AUDIT_SKIP_PATHS,
+    AUDITED_HTTP_METHODS,
+    HTTP_METHOD_TO_ACTION,
+    AuditRequestState,
+    AuditResourceType,
+)
 from app.core.database import get_db
 from app.audit_app.services import AuditService
 from app.user_app.models import User
@@ -27,19 +35,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
     The audit logging is done in the background to avoid blocking requests.
     """
 
-    # Paths that should not be audited (to avoid noise)
-    SKIP_PATHS = [
-        "/docs",
-        "/redoc",
-        "/openapi.json",
-        "/favicon.ico",
-        "/health",
-        "/metrics",
-        "/static",
-    ]
-
-    # HTTP methods that should be audited
-    AUDIT_METHODS = ["POST", "PUT", "PATCH", "DELETE"]
+    # Paths / prefixes to skip + HTTP methods to audit are declared in
+    # app.audit_app.constants to keep a single source of truth shared with
+    # AuditService and the ORM-level CHECK constraint. Class attributes are
+    # preserved for backward compatibility with any external caller reading
+    # them (e.g. tests).
+    SKIP_PATHS: tuple[str, ...] = AUDIT_SKIP_PATHS
+    AUDIT_METHODS: tuple[str, ...] = AUDITED_HTTP_METHODS
 
     async def dispatch(
         self, request: Request, call_next: Callable
@@ -70,10 +72,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # Skip if the endpoint already logged the action manually
         # (via AuditService.log_action / log_model_change / log_export /
         # log_login / log_logout / log_view / audit_action decorator).
-        # AuditService sets request.state.audit_logged = True whenever a
+        # AuditService sets request.state.<AUDIT_LOGGED> = True whenever a
         # request is passed to it, so we can rely on it here to avoid
         # producing a duplicate audit entry.
-        already_logged = getattr(request.state, "audit_logged", False)
+        already_logged = getattr(
+            request.state, AuditRequestState.AUDIT_LOGGED, False
+        )
 
         # Only audit certain methods or failed requests, and never double-log
         should_audit = (
@@ -112,8 +116,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 return True
 
         # Skip audit endpoints themselves (to avoid recursion)
-        if path.startswith("/api/audit"):
-            return True
+        for prefix in AUDIT_SKIP_PATH_PREFIXES:
+            if path.startswith(prefix):
+                return True
 
         return False
 
@@ -127,14 +132,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         Returns:
             Audit action string
         """
-        method_map = {
-            "POST": "CREATE",
-            "PUT": "UPDATE",
-            "PATCH": "UPDATE",
-            "DELETE": "DELETE",
-            "GET": "VIEW"
-        }
-        return method_map.get(method, method)
+        return HTTP_METHOD_TO_ACTION.get(method, method)
 
     def _extract_resource_type(self, path: str) -> str:
         """
@@ -152,10 +150,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         # Split by / and get the first segment
         parts = path.strip("/").split("/")
-        if parts:
+        if parts and parts[0]:
             return parts[0]
 
-        return "unknown"
+        return AuditResourceType.UNKNOWN.value
 
     async def _log_request(
         self,

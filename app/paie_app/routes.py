@@ -23,6 +23,7 @@ from app.paie_app.services import (
     StatisticsService,
     NotificationService
 )
+from app.audit_app.constants import AuditAction, AuditResourceType
 from app.audit_app.services import AuditService
 
 
@@ -58,8 +59,8 @@ async def create_alert(
     await AuditService.log_action(
         db=db,
         user=current_user,
-        action="CREATE",
-        resource_type="alert",
+        action=AuditAction.CREATE.value,
+        resource_type=AuditResourceType.ALERT.value,
         resource_id=str(db_alert.id),
         new_values=alert.model_dump(),
         request=request
@@ -102,8 +103,8 @@ async def send_alert_notification(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="UPDATE",
-            resource_type="alert",
+            action=AuditAction.UPDATE.value,
+            resource_type=AuditResourceType.ALERT.value,
             resource_id=str(alert_id),
             new_values={"action": "send_notification", "success": success},
             request=request
@@ -160,8 +161,8 @@ async def create_retenue(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="CREATE",
-            resource_type="retenue",
+            action=AuditAction.CREATE.value,
+            resource_type=AuditResourceType.RETENUE.value,
             resource_id=str(db_retenue.id),
             new_values=retenue.model_dump(),
             request=request
@@ -219,8 +220,8 @@ async def create_periode(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="CREATE",
-            resource_type="periode_paie",
+            action=AuditAction.CREATE.value,
+            resource_type=AuditResourceType.PERIODE_PAIE.value,
             resource_id=str(db_periode.id),
             new_values={"annee": periode.annee, "mois": periode.mois},
             request=request
@@ -244,8 +245,8 @@ async def process_periode(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="UPDATE",
-            resource_type="periode_paie",
+            action=AuditAction.UPDATE.value,
+            resource_type=AuditResourceType.PERIODE_PAIE.value,
             resource_id=str(periode_id),
             new_values={"action": "process", "results": results},
             request=request
@@ -275,8 +276,8 @@ async def finalize_periode(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="UPDATE",
-            resource_type="periode_paie",
+            action=AuditAction.UPDATE.value,
+            resource_type=AuditResourceType.PERIODE_PAIE.value,
             resource_id=str(periode_id),
             new_values={"action": "finalize"},
             request=request
@@ -300,8 +301,8 @@ async def approve_periode(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="UPDATE",
-            resource_type="periode_paie",
+            action=AuditAction.UPDATE.value,
+            resource_type=AuditResourceType.PERIODE_PAIE.value,
             resource_id=str(periode_id),
             new_values={"action": "approve"},
             request=request
@@ -368,8 +369,8 @@ async def calculate_entree(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="UPDATE",
-            resource_type="entree_paie",
+            action=AuditAction.UPDATE.value,
+            resource_type=AuditResourceType.ENTREE_PAIE.value,
             resource_id=str(entree_id),
             new_values={"action": "calculate"},
             request=request
@@ -403,7 +404,7 @@ async def export_periode(
         await AuditService.log_export(
             db=db,
             user=current_user,
-            resource_type="periode_paie",
+            resource_type=AuditResourceType.PERIODE_PAIE.value,
             format_type=export_format,
             count=1,
             request=request
@@ -442,7 +443,7 @@ async def export_all_periodes(
         await AuditService.log_export(
             db=db,
             user=current_user,
-            resource_type="all_periodes",
+            resource_type=AuditResourceType.ALL_PERIODES.value,
             format_type="excel",
             count=1,
             request=request
@@ -478,7 +479,7 @@ async def export_retenues(
         await AuditService.log_export(
             db=db,
             user=current_user,
-            resource_type="retenues",
+            resource_type=AuditResourceType.RETENUES.value,
             format_type="csv",
             count=1,
             request=request
@@ -512,7 +513,7 @@ async def export_payroll(
     await AuditService.log_export(
         db=db,
         user=current_user,
-        resource_type="payroll",
+        resource_type=AuditResourceType.PAYROLL.value,
         format_type=export_format,
         count=len(periodes),
         request=request
@@ -541,8 +542,8 @@ async def generate_payslip(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="CREATE",
-            resource_type="payslip",
+            action=AuditAction.CREATE.value,
+            resource_type=AuditResourceType.PAYSLIP.value,
             resource_id=str(entree_id),
             new_values={"file_path": file_path},
             request=request
@@ -618,8 +619,8 @@ async def generate_all_payslips(
         await AuditService.log_action(
             db=db,
             user=current_user,
-            action="CREATE",
-            resource_type="payslip_bulk",
+            action=AuditAction.CREATE.value,
+            resource_type=AuditResourceType.PAYSLIP_BULK.value,
             resource_id=str(periode_id),
             new_values={
                 "count": len(file_paths),
