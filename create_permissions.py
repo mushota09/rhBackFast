@@ -37,8 +37,11 @@ MODEL_RESOURCE_MAPPING = {
     "TypeConge": "conge_type",
     "DemandeConge": "conge_demande",
     "SoldeConge": "conge_solde",
-    "HistoriqueConge": "conge_historique",
-    "JourFerie": "conge_jour_ferie",
+    "HistoriqueDemande": "conge_historique",
+    "DemandeAttribution": "conge_attribution",
+    "StatutProcessus": "conge_statut",
+    "EtapeProcessus": "conge_etape",
+    "ActionEtapeProcessus": "conge_action",
 }
 
 # Actions to create for each model
@@ -61,7 +64,10 @@ CONTENT_TYPE_MAPPING = {
     "conge_demande": 13,
     "conge_solde": 14,
     "conge_historique": 15,
-    "conge_jour_ferie": 16,
+    "conge_attribution": 16,
+    "conge_statut": 17,
+    "conge_etape": 18,
+    "conge_action": 19,
 }
 
 

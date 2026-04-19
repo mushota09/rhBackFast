@@ -28,7 +28,14 @@ from app.paie_app.models import (
 )
 from app.reset_password_app.models import PasswordResetOTP
 from app.conge_app.models import (
-    TypeConge, JourFerie, DemandeConge, SoldeConge, HistoriqueConge
+    TypeConge,
+    SoldeConge,
+    StatutProcessus,
+    EtapeProcessus,
+    ActionEtapeProcessus,
+    DemandeConge,
+    DemandeAttribution,
+    HistoriqueDemande,
 )
 
 # this is the Alembic Config object, which provides
