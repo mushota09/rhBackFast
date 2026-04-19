@@ -1,6 +1,6 @@
 """Pydantic schemas for paie_app"""
 from datetime import datetime, date
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field, ConfigDict
 from decimal import Decimal
 
@@ -110,8 +110,78 @@ class PeriodePaieResponse(PeriodePaieBase):
     total_cotisations_patronales: Optional[Decimal] = None
     total_cotisations_salariales: Optional[Decimal] = None
     total_net_a_payer: Optional[Decimal] = None
+    # Workflow
+    etape_courante_id: Optional[int] = None
+    statut_global_id: Optional[int] = None
+    responsable_id: Optional[int] = None
+    date_soumission: Optional[datetime] = None
+    date_decision_finale: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Schémas workflow paie
+# ---------------------------------------------------------------------------
+
+
+class SubmitPeriodeRequest(BaseModel):
+    """Corps de la requête de soumission au workflow."""
+
+    responsable_id: Optional[int] = Field(
+        default=None,
+        description=(
+            "Employé responsable utilisé si une étape du workflow est "
+            "configurée avec `is_responsable=True`."
+        ),
+    )
+
+
+class AppliquerActionPaieRequest(BaseModel):
+    action_id: int
+    commentaire: Optional[str] = None
+
+
+class ActionPaieResponse(BaseModel):
+    id: int
+    etape_id: int
+    nom_action: str
+    statut_cible_id: int
+    etape_suivante_id: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ActionsPaiePossiblesResponse(BaseModel):
+    etape_courante_id: Optional[int]
+    is_valideur: bool
+    actions: List[ActionPaieResponse]
+
+
+class AttributionPaieResponse(BaseModel):
+    id: int
+    demande_type: str
+    demande_id: int
+    etape_id: int
+    valideur_attribue_id: int
+    date_attribution: datetime
+    statut: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HistoriquePaieResponse(BaseModel):
+    id: int
+    demande_type: str
+    demande_id: int
+    etape_id: int
+    action_id: int
+    nouveau_statut_id: int
+    valideur_id: int
+    commentaire: Optional[str] = None
+    created_at: datetime
+
     model_config = ConfigDict(from_attributes=True)
 
 

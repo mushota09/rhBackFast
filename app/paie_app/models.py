@@ -118,7 +118,15 @@ class RetenueEmploye(BaseModel):
 
 
 class PeriodePaie(BaseModel):
-    """Payroll period model"""
+    """Payroll period model.
+
+    La période de paie porte désormais un workflow dynamique piloté par les
+    tables génériques partagées avec ``conge_app`` (``cg_statut_processus``,
+    ``cg_etape_processus``, ``cg_demande_attribution``, ``cg_historique_demande``).
+    Le champ ``statut`` texte historique est conservé pour la rétro-compatibilité :
+    il reflète l'état global mais le workflow reste l'unique source de vérité.
+    """
+
     __tablename__ = "paie_periode"
 
     annee: Mapped[int] = mapped_column(Integer)
@@ -143,6 +151,25 @@ class PeriodePaie(BaseModel):
     total_cotisations_patronales: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=0)
     total_cotisations_salariales: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=0)
     total_net_a_payer: Mapped[Decimal] = mapped_column(Numeric(15, 2), default=0)
+
+    # -- Workflow dynamique (partagé avec conge_app) --
+    etape_courante_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cg_etape_processus.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    statut_global_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cg_statut_processus.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    responsable_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("rh_employe.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    date_soumission: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    date_decision_finale: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Relationships
     entries: Mapped[list["EntreePaie"]] = relationship(

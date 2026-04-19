@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # Initialize default CONGE workflow (statuses, types, steps, actions) at startup.
     CONGE_INIT_DEFAULTS: bool = True
 
+    # Paie Workflow Configuration
+    # Initialize default PAIE workflow (statuses, steps, actions) at startup.
+    PAIE_INIT_DEFAULTS: bool = True
+
     # SUPABASE
 
     SUPABASE_URL: str = "https://ylyspjvzsgcekuaywuot.supabase.co"
