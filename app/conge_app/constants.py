@@ -1,76 +1,47 @@
-"""Leave management constants and enumerations"""
+"""Leave management constants and enumerations."""
 from enum import Enum
 
 
 class DemiJournee(str, Enum):
-    """Half-day period enumeration"""
-    MATIN = "MATIN"
-    APRES_MIDI = "APRES_MIDI"
-    JOURNEE_COMPLETE = "JOURNEE_COMPLETE"
+    """Demi-journée (matin / après-midi) pour le début ou la fin d'une demande."""
+    MATIN = "matin"
+    APRES_MIDI = "apres-midi"
 
 
-class StatutDemande(str, Enum):
-    """Leave request status enumeration"""
-    PENDING = "PENDING"
-    IN_PROGRESS = "IN_PROGRESS"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
-    CANCELLED = "CANCELLED"
+class StatutAttribution(str, Enum):
+    """Statut d'une ligne d'attribution de validation."""
+    EN_ATTENTE = "en_attente"
+    PRISE_EN_CHARGE = "prise_en_charge"
+    TRAITEE = "traitee"
 
 
-class ActionHistorique(str, Enum):
-    """History action enumeration"""
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
-    DELEGATED = "DELEGATED"
+class CodeProcessus(str, Enum):
+    """Codes de processus workflow supportés."""
+    CONGE = "CONGE"
 
 
-class TypeDateFerie(str, Enum):
-    """Holiday date type enumeration"""
-    NORMAL = "NORMAL"  # Date normale (fixe)
-    ESTIMATED = "ESTIMATED"  # Date estimée (fêtes lunaires)
-    OBSERVED = "OBSERVED"  # Date observée (reportée si weekend)
+class CodeStatut(str, Enum):
+    """Codes de statut globaux d'un processus (valeurs par défaut)."""
+    EN_ATTENTE = "EN_ATTENTE"
+    EN_COURS = "EN_COURS"
+    VALIDE = "VALIDE"
+    REJETE = "REJETE"
+    ANNULE = "ANNULE"
 
 
-# Supported countries (extensible)
-PAYS_SUPPORTES = {
-    "CD": "République Démocratique du Congo",
-    "FR": "France",
-    "BE": "Belgique",
-    "CA": "Canada",
-    "US": "United States",
-    "GB": "United Kingdom",
-    "DE": "Germany",
-    "ES": "Spain",
-    "IT": "Italy",
-    "NL": "Netherlands",
-    "CH": "Switzerland",
-    "LU": "Luxembourg",
-    "BI": "Burundi",
-}
+# Langues supportées par la lib `holidays` (liste non-exhaustive, extensible).
+SUPPORTED_HOLIDAY_LANGUAGES = ("fr", "en")
 
-# Permissions for leave management
+# Permissions applicatives du module congé (custom, non CRUD).
 PERMISSIONS = {
     "conge.view": "Consulter les congés",
-    "conge.create": "Créer des demandes de congés",
-    "conge.update": "Modifier des demandes de congés",
-    "conge.delete": "Supprimer des demandes de congés",
-    "conge.approve": "Approuver des demandes de congés",
-    "conge.manage_types": "Gérer les types de congés",
-    "conge.manage_soldes": "Gérer les soldes de congés",
-    "conge.export": "Exporter les données de congés",
+    "conge.create": "Créer une demande de congé",
+    "conge.approve": "Valider / rejeter une demande de congé",
+    "conge.manage_types": "Gérer les types de congé",
+    "conge.manage_soldes": "Gérer les soldes de congé",
+    "conge.manage_workflow": "Gérer le workflow (étapes, actions, statuts)",
 }
 
-# Default configuration values
+# Valeurs par défaut
+DEFAULT_HOLIDAY_LANGUAGE = "fr"
 DEFAULT_COUNTRY_CODE = "BI"
-HOLIDAYS_AUTO_LOAD = True
-MAX_VALIDATION_LEVELS = 5
-MAX_DOCUMENT_SIZE_MB = 5
-ALLOWED_DOCUMENT_TYPES = ["pdf", "jpg", "jpeg", "png"]
-
-# Pagination defaults
-DEFAULT_SKIP = 0
-DEFAULT_LIMIT = 100
-MAX_LIMIT = 1000
-
-

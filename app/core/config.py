@@ -43,11 +43,12 @@ class Settings(BaseSettings):
     PERMISSION_CHECK_ENABLED: bool = False
 
     # Leave Management Configuration
-    CONGE__DEFAULT_COUNTRY_CODE: str = "BI"
-    CONGE__HOLIDAYS_AUTO_LOAD: bool = True
-    CONGE__MAX_VALIDATION_LEVELS: int = 5
-    CONGE__MAX_DOCUMENT_SIZE_MB: int = 100
-    CONGE__ALLOWED_DOCUMENT_TYPES: str = "pdf,jpg,jpeg,png"
+    # Country used when querying the `holidays` Python library.
+    CONGE_DEFAULT_COUNTRY_CODE: str = "BI"
+    # Holiday names language ("fr" or "en" supported at the moment).
+    CONGE_HOLIDAY_LANGUAGE: str = "fr"
+    # Initialize default CONGE workflow (statuses, types, steps, actions) at startup.
+    CONGE_INIT_DEFAULTS: bool = True
 
     # SUPABASE
 

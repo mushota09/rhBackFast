@@ -15,9 +15,8 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.core.database import Base
 from app.user_app.models import Permission
-from app.conge_app.models import JourFerie
-from app.conge_app.services.holiday_service import HolidayService
 from app.conge_app.constants import PERMISSIONS as CONGE_PERMISSIONS
+from app.conge_app.init_data import init_conge_defaults
 
 
 # Audit app permissions
@@ -296,77 +295,31 @@ async def create_default_permissions():
         await engine.dispose()
 
 
-async def load_default_holidays():
-    """
-    Load default holidays for supported countries.
-    This runs at application startup if CONGE__HOLIDAYS_AUTO_LOAD is True.
-    """
-    # Vérifier si l'auto-chargement est activé
-    holidays_auto_load = getattr(
-        settings, "CONGE__HOLIDAYS_AUTO_LOAD", True
-    )
+async def init_conge_workflow_defaults():
+    """Initialise les données par défaut du module congé (statuts, types, workflow).
 
-    if not holidays_auto_load:
-        print("⏭️  Auto-load holidays disabled")
+    Rien n'est fait si ``CONGE_INIT_DEFAULTS=False``. Le reste s'appuie uniquement
+    sur la lib `holidays` à la volée : aucun chargement en base n'est nécessaire.
+    """
+    if not getattr(settings, "CONGE_INIT_DEFAULTS", True):
+        print("⏭️  Conge defaults init disabled")
         return
 
-    print("\n🎉 Loading default holidays...")
+    print("\n🎉 Initializing CONGE workflow defaults...")
 
-    # Créer engine et session
     engine = create_async_engine(settings.DATABASE_URL, echo=False)
     async_session = async_sessionmaker(
         engine,
         class_=AsyncSession,
-        expire_on_commit=False
+        expire_on_commit=False,
     )
-
-    COUNTRIES = ["CD", "FR", "BE", "BI"]
-    YEARS = [2024, 2025, 2026]
-    total_loaded = 0
 
     try:
         async with async_session() as session:
-            for country in COUNTRIES:
-                for year in YEARS:
-                    try:
-                        # Compter avant
-                        stmt = select(JourFerie).where(
-                            JourFerie.pays_code == country,
-                            JourFerie.annee == year
-                        )
-                        result = await session.execute(stmt)
-                        before_count = len(result.scalars().all())
-
-                        # Charger
-                        await HolidayService.load_holidays_for_country(
-                            country, year, session
-                        )
-
-                        # Compter après
-                        result = await session.execute(stmt)
-                        after_count = len(result.scalars().all())
-
-                        loaded = after_count - before_count
-                        total_loaded += loaded
-
-                        if loaded > 0:
-                            msg = (
-                                f"  ✅ {country} {year}: "
-                                f"{loaded} new holidays"
-                            )
-                            print(msg)
-                    except Exception as e:
-                        print(f"  ⚠️  {country} {year}: {e}")
-
-        if total_loaded > 0:
-            print(f"✅ Loaded {total_loaded} new holidays")
-        else:
-            print("⏭️  All holidays already loaded")
-
-        print("✓ Holiday initialization complete\n")
-
+            await init_conge_defaults(session)
+        print("✓ CONGE defaults initialization complete\n")
     except Exception as e:
-        print(f"❌ Error loading holidays: {e}\n")
+        print(f"❌ Error initializing CONGE defaults: {e}\n")
     finally:
         await engine.dispose()
 
@@ -377,7 +330,7 @@ async def run_startup_tasks():
     This is called when the application starts.
     """
     await create_default_permissions()
-    await load_default_holidays()
+    await init_conge_workflow_defaults()
     # Add other startup tasks here in the future
 
 
