@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.permissions import require_permission
+from app.core.query_utils import apply_expansion, parse_expand_param
 from app.user_app.models import User
 from app.audit_app.models import AuditLog
 from app.audit_app.schemas import (
@@ -32,7 +33,8 @@ async def list_audit_logs(
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
-    failed_only: bool = Query(False)
+    failed_only: bool = Query(False),
+    expand: Optional[str] = Query(None, description="Relations supplémentaires (user)"),
 ):
     """
     List audit logs with filtering and pagination.
@@ -49,8 +51,10 @@ async def list_audit_logs(
 
     Requires permission: audit.view
     """
-    # Build query
+    # Build query (user is always eager-loaded for display)
     query = select(AuditLog).options(selectinload(AuditLog.user))
+    if expand:
+        query = apply_expansion(query, AuditLog, parse_expand_param(expand))
 
     # Apply filters
     filters = []
@@ -198,7 +202,8 @@ async def get_user_audit_logs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("audit", "view")),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100)
+    limit: int = Query(50, ge=1, le=100),
+    expand: Optional[str] = Query(None, description="Relations supplémentaires (user)"),
 ):
     """
     Get audit logs for a specific user.
@@ -209,6 +214,8 @@ async def get_user_audit_logs(
     query = select(AuditLog).options(selectinload(AuditLog.user)).where(
         AuditLog.user_id == user_id
     )
+    if expand:
+        query = apply_expansion(query, AuditLog, parse_expand_param(expand))
 
     # Get total count
     count_query = select(func.count()).select_from(AuditLog).where(
@@ -239,7 +246,8 @@ async def get_resource_audit_logs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("audit", "view")),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100)
+    limit: int = Query(50, ge=1, le=100),
+    expand: Optional[str] = Query(None, description="Relations supplémentaires (user)"),
 ):
     """
     Get audit logs for a specific resource type.
@@ -250,6 +258,8 @@ async def get_resource_audit_logs(
     query = select(AuditLog).options(selectinload(AuditLog.user)).where(
         AuditLog.resource_type == resource_type
     )
+    if expand:
+        query = apply_expansion(query, AuditLog, parse_expand_param(expand))
 
     # Get total count
     count_query = select(func.count()).select_from(AuditLog).where(
@@ -278,7 +288,8 @@ async def get_resource_audit_logs(
 async def get_audit_log(
     log_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_permission("audit", "view"))
+    current_user: User = Depends(require_permission("audit", "view")),
+    expand: Optional[str] = Query(None, description="Relations supplémentaires (user)"),
 ):
     """
     Get a specific audit log by ID.
@@ -288,6 +299,8 @@ async def get_audit_log(
     query = select(AuditLog).options(selectinload(AuditLog.user)).where(
         AuditLog.id == log_id
     )
+    if expand:
+        query = apply_expansion(query, AuditLog, parse_expand_param(expand))
     result = await db.execute(query)
     log = result.scalar_one_or_none()
 
