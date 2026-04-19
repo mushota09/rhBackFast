@@ -4,6 +4,16 @@ from typing import Optional, List, Generic, TypeVar
 from decimal import Decimal
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
+from app.user_app.constants import (
+    DEFAULT_DEVISE,
+    DEVISE_MAX_LENGTH,
+    SEXE_MAX_LENGTH,
+    STATUT_EMPLOI_MAX_LENGTH,
+    STATUT_MATRIMONIAL_MAX_LENGTH,
+    TYPE_CONTRAT_MAX_LENGTH,
+    StatutEmploi,
+)
+
 T = TypeVar('T')
 
 
@@ -156,8 +166,10 @@ class EmployeBase(BaseModel):
     nom: str = Field(..., max_length=255)
     postnom: Optional[str] = Field(None, max_length=255)
     date_naissance: date
-    sexe: str = Field(..., max_length=1)
-    statut_matrimonial: str = Field(..., max_length=1)
+    sexe: str = Field(..., max_length=SEXE_MAX_LENGTH)
+    statut_matrimonial: str = Field(
+        ..., max_length=STATUT_MATRIMONIAL_MAX_LENGTH
+    )
     nationalite: str = Field(..., max_length=100)
     banque: str = Field(..., max_length=255)
     numero_compte: str = Field(..., max_length=255)
@@ -177,7 +189,10 @@ class EmployeBase(BaseModel):
     poste_id: Optional[int] = None
     responsable_id: Optional[int] = None
     date_embauche: date
-    statut_emploi: str = Field(default="ACTIVE", max_length=20)
+    statut_emploi: str = Field(
+        default=StatutEmploi.ACTIVE.value,
+        max_length=STATUT_EMPLOI_MAX_LENGTH,
+    )
     nombre_enfants: int = 0
     nom_conjoint: Optional[str] = Field(None, max_length=100)
     biographie: Optional[str] = None
@@ -195,14 +210,18 @@ class EmployeUpdate(BaseModel):
     nom: Optional[str] = Field(None, max_length=255)
     postnom: Optional[str] = Field(None, max_length=255)
     date_naissance: Optional[date] = None
-    sexe: Optional[str] = Field(None, max_length=1)
-    statut_matrimonial: Optional[str] = Field(None, max_length=1)
+    sexe: Optional[str] = Field(None, max_length=SEXE_MAX_LENGTH)
+    statut_matrimonial: Optional[str] = Field(
+        None, max_length=STATUT_MATRIMONIAL_MAX_LENGTH
+    )
     nationalite: Optional[str] = Field(None, max_length=100)
     email_personnel: Optional[EmailStr] = None
     telephone_personnel: Optional[str] = Field(None, max_length=17)
     adresse_ligne1: Optional[str] = Field(None, max_length=200)
     date_embauche: Optional[date] = None
-    statut_emploi: Optional[str] = Field(None, max_length=20)
+    statut_emploi: Optional[str] = Field(
+        None, max_length=STATUT_EMPLOI_MAX_LENGTH
+    )
     poste_id: Optional[int] = None
 
 
@@ -249,7 +268,7 @@ class EmployeFilter(BaseModel):
 
 class ContratBase(BaseModel):
     """Base contract schema"""
-    type_contrat: str = Field(..., max_length=50)
+    type_contrat: str = Field(..., max_length=TYPE_CONTRAT_MAX_LENGTH)
     date_debut: date
     date_fin: Optional[date] = None
     salaire_base: Decimal = Field(..., gt=0)
@@ -263,7 +282,9 @@ class ContratBase(BaseModel):
     assurance_salariale: Decimal = Field(default=0, ge=0)
     fpc_patronale: Decimal = Field(default=0, ge=0)
     fpc_salariale: Decimal = Field(default=0, ge=0)
-    devise: str = Field(default="USD", max_length=3)
+    devise: str = Field(
+        default=DEFAULT_DEVISE, max_length=DEVISE_MAX_LENGTH
+    )
     is_active: bool = True
 
 
@@ -274,7 +295,9 @@ class ContratCreate(ContratBase):
 
 class ContratUpdate(BaseModel):
     """Schema for updating a contract"""
-    type_contrat: Optional[str] = Field(None, max_length=50)
+    type_contrat: Optional[str] = Field(
+        None, max_length=TYPE_CONTRAT_MAX_LENGTH
+    )
     date_debut: Optional[date] = None
     date_fin: Optional[date] = None
     salaire_base: Optional[Decimal] = Field(None, gt=0)
@@ -288,7 +311,7 @@ class ContratUpdate(BaseModel):
     assurance_salariale: Optional[Decimal] = Field(None, ge=0)
     fpc_patronale: Optional[Decimal] = Field(None, ge=0)
     fpc_salariale: Optional[Decimal] = Field(None, ge=0)
-    devise: Optional[str] = Field(None, max_length=3)
+    devise: Optional[str] = Field(None, max_length=DEVISE_MAX_LENGTH)
     is_active: Optional[bool] = None
 
 
