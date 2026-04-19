@@ -28,10 +28,11 @@ from app.conge_app.models import (
 from app.core.database import Base
 from app.paie_app import models as _paie_models  # noqa: F401
 from app.paie_app.models import PeriodePaie
-from app.paie_app.workflow_constants import (
+from app.paie_app.constants import (
     CodeProcessusPaie,
     CodeStatutPaie,
     NomActionPaie,
+    PeriodeStatutTexte,
 )
 from app.reset_password_app import models as _pwd_models  # noqa: F401
 from app.user_app import models as _user_models  # noqa: F401
@@ -246,7 +247,7 @@ async def paie_workflow_setup(db: AsyncSession):
         mois=1,
         date_debut=date(2025, 1, 1),
         date_fin=date(2025, 1, 31),
-        statut="DRAFT",
+        statut=PeriodeStatutTexte.DRAFT.value,
     )
     db.add(periode)
     await db.commit()

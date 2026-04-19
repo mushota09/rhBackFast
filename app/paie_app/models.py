@@ -9,6 +9,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.paie_app.constants import (
+    AlertSeverity,
+    AlertStatus,
+    PeriodeStatutTexte,
+)
 
 if TYPE_CHECKING:
     from app.user_app.models import Employe
@@ -32,8 +37,12 @@ class Alert(BaseModel):
     __tablename__ = "paie_alert"
 
     alert_type: Mapped[str] = mapped_column(String(50))
-    severity: Mapped[str] = mapped_column(String(20), default="MEDIUM")
-    status: Mapped[str] = mapped_column(String(20), default="ACTIVE")
+    severity: Mapped[str] = mapped_column(
+        String(20), default=AlertSeverity.MEDIUM.value
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default=AlertStatus.ACTIVE.value
+    )
 
     title: Mapped[str] = mapped_column(String(255))
     message: Mapped[str] = mapped_column(Text)
@@ -133,7 +142,9 @@ class PeriodePaie(BaseModel):
     mois: Mapped[int] = mapped_column(Integer)
     date_debut: Mapped[date] = mapped_column(Date)
     date_fin: Mapped[date] = mapped_column(Date)
-    statut: Mapped[str] = mapped_column(String(20), default="DRAFT")
+    statut: Mapped[str] = mapped_column(
+        String(20), default=PeriodeStatutTexte.DRAFT.value
+    )
 
     traite_par_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("user_management_user.id", ondelete="SET NULL"),

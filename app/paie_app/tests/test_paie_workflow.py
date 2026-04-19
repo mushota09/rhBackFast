@@ -7,9 +7,11 @@ from app.paie_app.services.paie_workflow_service import (
     PaieWorkflowService,
     PaieWorkflowStateError,
 )
-from app.paie_app.workflow_constants import (
+from app.paie_app.constants import (
     CodeStatutPaie,
     DemandeTypePaie,
+    PeriodeStatutTexte,
+    StatutAttribution,
 )
 
 
@@ -35,7 +37,7 @@ class TestPaieWorkflow:
         assert periode.date_soumission is not None
         assert periode.date_decision_finale is None
         # Le statut texte doit être synchronisé (PROCESSING)
-        assert periode.statut == "PROCESSING"
+        assert periode.statut == PeriodeStatutTexte.PROCESSING.value
 
         # Attribution créée pour l'employé RH (seul sur le poste)
         attributions = await AttributionService.list_attributions_for_step(
@@ -47,7 +49,7 @@ class TestPaieWorkflow:
         assert len(attributions) == 1
         assert attributions[0].valideur_attribue_id == setup["employes"]["rh"].id
         # Seul valideur → directement prise_en_charge
-        assert attributions[0].statut == "prise_en_charge"
+        assert attributions[0].statut == StatutAttribution.PRISE_EN_CHARGE.value
 
     @pytest.mark.asyncio
     async def test_submit_twice_raises(self, db, paie_workflow_setup):
@@ -95,7 +97,7 @@ class TestPaieWorkflow:
         )
         assert len(attributions) == 1
         assert attributions[0].valideur_attribue_id == setup["employes"]["chef"].id
-        assert attributions[0].statut == "prise_en_charge"
+        assert attributions[0].statut == StatutAttribution.PRISE_EN_CHARGE.value
 
         # 3. Chef → APPROUVER (passe à Direction)
         periode = await PaieWorkflowService.apply_action(
@@ -123,7 +125,7 @@ class TestPaieWorkflow:
             == setup["statuts"][CodeStatutPaie.VALIDE.value].id
         )
         # Passage VALIDE → statut texte APPROVED
-        assert periode.statut == "APPROVED"
+        assert periode.statut == PeriodeStatutTexte.APPROVED.value
         assert periode.date_decision_finale is None  # workflow pas encore fini
 
         # 5. Finance → MARQUER_PAYE (fin de workflow, statut PAYE)
@@ -139,7 +141,7 @@ class TestPaieWorkflow:
             periode.statut_global_id
             == setup["statuts"][CodeStatutPaie.PAYE.value].id
         )
-        assert periode.statut == "PAID"
+        assert periode.statut == PeriodeStatutTexte.PAID.value
         assert periode.date_decision_finale is not None
 
     @pytest.mark.asyncio
@@ -169,7 +171,7 @@ class TestPaieWorkflow:
             == setup["statuts"][CodeStatutPaie.REJETE.value].id
         )
         assert periode.date_decision_finale is not None
-        assert periode.statut == "DRAFT"
+        assert periode.statut == PeriodeStatutTexte.DRAFT.value
 
     @pytest.mark.asyncio
     async def test_non_valideur_cannot_act(self, db, paie_workflow_setup):
@@ -239,6 +241,6 @@ class TestPaieWorkflow:
         )
         assert any(
             a.valideur_attribue_id == setup["employes"]["rh"].id
-            and a.statut == "prise_en_charge"
+            and a.statut == StatutAttribution.PRISE_EN_CHARGE.value
             for a in attributions
         )

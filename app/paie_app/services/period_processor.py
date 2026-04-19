@@ -8,6 +8,7 @@ from calendar import monthrange
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.paie_app.constants import PeriodeStatutTexte
 from app.paie_app.models import PeriodePaie, EntreePaie
 from app.paie_app.services.salary_calculator import SalaryCalculatorService
 from app.user_app.models import Employe, Contrat
@@ -49,7 +50,7 @@ class PeriodProcessorService:
             mois=mois,
             date_debut=date_debut,
             date_fin=date_fin,
-            statut='DRAFT',
+            statut=PeriodeStatutTexte.DRAFT.value,
             traite_par_id=user_id
         )
         self.db.add(periode)
@@ -68,7 +69,7 @@ class PeriodProcessorService:
         if not periode:
             raise ValueError(f"Period {periode_id} not found")
 
-        if periode.statut != 'DRAFT':
+        if periode.statut != PeriodeStatutTexte.DRAFT.value:
             raise ValueError(
                 f"Period {periode_id} cannot be processed"
             )
@@ -202,8 +203,9 @@ class PeriodProcessorService:
         periode.total_net_a_payer = results['total_salaire_net']
         periode.nombre_employes = results['employes_traites']
         periode.statut = (
-            'COMPLETED' if results['employes_erreurs'] == 0
-            else 'PROCESSING'
+            PeriodeStatutTexte.COMPLETED.value
+            if results['employes_erreurs'] == 0
+            else PeriodeStatutTexte.PROCESSING.value
         )
 
         await self.db.commit()
@@ -225,7 +227,7 @@ class PeriodProcessorService:
             errors.append(f"Period {periode_id} not found")
             return errors
 
-        if periode.statut == 'DRAFT':
+        if periode.statut == PeriodeStatutTexte.DRAFT.value:
             errors.append("Period has not been processed yet")
             return errors
 
@@ -259,7 +261,7 @@ class PeriodProcessorService:
             error_msg = f"Cannot finalize: {', '.join(errors)}"
             raise ValueError(error_msg)
 
-        periode.statut = 'FINALIZED'
+        periode.statut = PeriodeStatutTexte.FINALIZED.value
         await self.db.commit()
         await self.db.refresh(periode)
 
@@ -278,12 +280,12 @@ class PeriodProcessorService:
         if not periode:
             raise ValueError(f"Period {periode_id} not found")
 
-        if periode.statut != 'FINALIZED':
+        if periode.statut != PeriodeStatutTexte.FINALIZED.value:
             raise ValueError(
                 "Period must be finalized before approval"
             )
 
-        periode.statut = 'APPROVED'
+        periode.statut = PeriodeStatutTexte.APPROVED.value
         periode.approuve_par_id = user_id
         periode.date_approbation = datetime.utcnow()
 
