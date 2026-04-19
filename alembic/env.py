@@ -18,25 +18,6 @@ from app.core.database import Base
 from app.core.config import settings
 
 # Import all models to ensure they're registered with Base.metadata
-from app.user_app.models import (
-    User, Group, Permission, UserGroup, GroupPermission,
-    ServiceGroup, Service, Employe, Contrat, Document
-)
-from app.audit_app.models import AuditLog
-from app.paie_app.models import (
-    Alert, RetenueEmploye, PeriodePaie, EntreePaie
-)
-from app.reset_password_app.models import PasswordResetOTP
-from app.conge_app.models import (
-    TypeConge,
-    SoldeConge,
-    StatutProcessus,
-    EtapeProcessus,
-    ActionEtapeProcessus,
-    DemandeConge,
-    DemandeAttribution,
-    HistoriqueDemande,
-)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

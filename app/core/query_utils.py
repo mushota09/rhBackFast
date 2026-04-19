@@ -1,7 +1,7 @@
 """Query utilities for filtering, searching, and expanding relations"""
 from typing import List, Optional, Any
 from sqlalchemy import Select, or_, func
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 
 
 def apply_filters(query: Select, filters: dict) -> Select:

@@ -1,7 +1,4 @@
 """Application configuration"""
-from decimal import Decimal
-from typing import Dict, List, Any
-from pydantic import Field, validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):

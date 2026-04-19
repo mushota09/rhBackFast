@@ -233,7 +233,7 @@ async def create_permissions_for_models():
             },
         ]
 
-        print(f"\n📦 Processing special conge permissions")
+        print("\n📦 Processing special conge permissions")
         for perm_data in special_conge_permissions:
             codename = perm_data["codename"]
 
@@ -267,7 +267,7 @@ async def create_permissions_for_models():
         await session.commit()
 
     print(f"\n{'='*60}")
-    print(f"✨ Summary:")
+    print("✨ Summary:")
     print(f"  - Created: {created_count} permissions")
     print(f"  - Skipped: {skipped_count} permissions (already exist)")
     print(f"  - Total: {created_count + skipped_count} permissions")
