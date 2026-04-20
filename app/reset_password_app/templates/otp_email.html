@@ -4,8 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Code de vérification - Réinitialisation de mot de passe</title>
+    <style>
+        body, table, td, div, h1, p { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; text-size-adjust: 100%; }
+        @media only screen and (max-width: 600px) {
+            .rh-header-td { padding: 32px 20px !important; }
+            .rh-eyebrow { font-size: 11px !important; letter-spacing: 3px !important; margin-bottom: 8px !important; }
+            .rh-title { font-size: 20px !important; line-height: 1.3 !important; }
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: {{ COLOR_BG_PAGE }}; color: {{ COLOR_TEXT_BODY }};">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: {{ COLOR_BG_PAGE }}; color: {{ COLOR_TEXT_BODY }}; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; text-size-adjust: 100%;">
     <table role="presentation" style="width: 100%; border-collapse: collapse;">
         <tr>
             <td align="center" style="padding: 40px 16px;">
@@ -13,11 +21,11 @@
 
                     <!-- Header -->
                     <tr>
-                        <td style="padding: 48px 32px; text-align: center; background: linear-gradient(135deg, {{ COLOR_PRIMARY }} 0%, {{ COLOR_PRIMARY_500 }} 100%);">
-                            <div style="font-size: 12px; letter-spacing: 4px; color: {{ COLOR_ACCENT }}; text-transform: uppercase; margin-bottom: 12px; font-weight: 600;">
+                        <td class="rh-header-td" style="padding: 48px 32px; text-align: center; background: linear-gradient(135deg, {{ COLOR_PRIMARY }} 0%, {{ COLOR_PRIMARY_500 }} 100%);">
+                            <div class="rh-eyebrow" style="font-size: 12px; letter-spacing: 4px; color: {{ COLOR_ACCENT }}; text-transform: uppercase; margin-bottom: 12px; font-weight: 600;">
                                 {{ COMPANY_NAME }}
                             </div>
-                            <h1 style="margin: 0; color: {{ COLOR_ON_PRIMARY }}; font-size: 26px; font-weight: 700; letter-spacing: -0.3px;">
+                            <h1 class="rh-title" style="margin: 0; color: {{ COLOR_ON_PRIMARY }}; font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: -0.3px;">
                                 Réinitialisation de mot de passe
                             </h1>
                         </td>
