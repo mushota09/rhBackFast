@@ -231,3 +231,37 @@ fais moi un portofolio sur base de l'image que je viens de te partager / nom:mus
 
 
 https://rhbackfast.onrender.com/docs
+
+## 🧪 Mock data (développement)
+
+Un script reproductible est disponible pour seeder une base de dev avec des données réalistes (services, postes, employés, contrats, congés, paie).
+
+### Pré-requis
+
+```bash
+uv run alembic upgrade head          # applique les migrations (crée les tables cg_*, paie_*, etc.)
+uv run python create_permissions.py  # (optionnel) crée les permissions RBAC de référence
+```
+
+### Exécution
+
+```bash
+uv run python -m scripts.seed_mock_data            # insert / upsert idempotent
+uv run python -m scripts.seed_mock_data --reset    # supprime les lignes mock puis réinsère
+uv run python -m scripts.seed_mock_data --quiet    # sans les logs intermédiaires
+```
+
+### Contenu seedé
+
+- **6 services / 4 groupes / 12 postes** (Direction, RH, IT, Finance, Opérations, Commercial)
+- **18 employés + comptes utilisateurs** avec hiérarchie à 2 niveaux (boss → managers → employés)
+- **Mot de passe par défaut pour tous les comptes** : `rapha12345678`
+- **Contrats actifs** (CDI / CDD / STAGE) avec salaire réaliste + indemnités en CDF
+- **Soldes de congé** pour chaque type (CA, CM, CSS) de l'année courante
+- **5 demandes de congé** couvrant les 5 statuts du workflow (`EN_ATTENTE`, `EN_COURS`, `VALIDE`, `REJETE`, `ANNULE`)
+- **2 périodes de paie** : mois précédent déjà `PAID` (workflow complet) + mois courant `DRAFT`
+- **1 entrée de paie par employé et par période**, retenues et alertes d'exemple
+
+Le script est **idempotent** : les doublons sont évités grâce aux clefs naturelles (`email`, `matricule`, `(annee, mois)`, `(employe_id, type_conge_id, annee)`…). Relancer le script ne duplique jamais de lignes.
+
+> ⚠️ Le mot de passe `rapha12345678` n'est acceptable qu'en environnement de développement. À ne jamais utiliser en production.
