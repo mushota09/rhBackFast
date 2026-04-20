@@ -106,6 +106,166 @@ class EmailService:
             )
             return False
 
+    async def send_password_changed_email(
+        self,
+        email: str,
+        user_name: Optional[str] = None,
+    ) -> bool:
+        """Send a confirmation email after a successful password reset.
+
+        Args:
+            email: Destination email address.
+            user_name: Recipient display name (optional).
+
+        Returns:
+            ``True`` if the email was sent, ``False`` otherwise. Failures
+            are logged but never raised — the password has already been
+            reset in DB at this point and the caller should not roll that
+            back just because the confirmation email failed.
+        """
+        try:
+            if not self.smtp_host:
+                logger.error(
+                    "Configuration SMTP manquante. Impossible d'envoyer "
+                    "la confirmation de changement de mot de passe."
+                )
+                return False
+
+            subject = "Votre mot de passe a été modifié"
+            html_content = self._render_password_changed_template(user_name)
+            plain_content = self._render_password_changed_plain_text(user_name)
+
+            message = MIMEMultipart("alternative")
+            message["Subject"] = subject
+            message["From"] = self.from_email
+            message["To"] = email
+            message.attach(MIMEText(plain_content, "plain", "utf-8"))
+            message.attach(MIMEText(html_content, "html", "utf-8"))
+
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                if self.smtp_tls:
+                    server.starttls()
+                if self.smtp_user and self.smtp_password:
+                    server.login(self.smtp_user, self.smtp_password)
+                server.send_message(message)
+
+            logger.info(
+                "Email de confirmation de changement de mot de passe "
+                "envoyé avec succès à %s",
+                email,
+            )
+            return True
+
+        except smtplib.SMTPAuthenticationError as e:
+            logger.exception(
+                "Authentification SMTP refusée lors de l'envoi de la "
+                "confirmation à %s (code=%s). Vérifier SMTP_USER/"
+                "SMTP_PASSWORD. Message serveur: %r",
+                email,
+                getattr(e, "smtp_code", "?"),
+                getattr(e, "smtp_error", b""),
+            )
+            return False
+        except smtplib.SMTPException as e:
+            logger.exception(
+                "Erreur SMTP lors de l'envoi de la confirmation à %s: %s",
+                email,
+                e,
+            )
+            return False
+        except Exception:
+            logger.exception(
+                "Erreur inattendue lors de l'envoi de la confirmation à %s",
+                email,
+            )
+            return False
+
+    def _render_password_changed_template(
+        self,
+        user_name: Optional[str],
+    ) -> str:
+        """Render the confirmation HTML body."""
+        template_path = (
+            Path(__file__).parent.parent
+            / "templates"
+            / "password_changed_email.html"
+        )
+        display_name = user_name if user_name else "Utilisateur"
+
+        try:
+            with open(template_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+
+            html_content = apply_branding(template_content)
+            html_content = html_content.replace(
+                "{{ user_name }}", display_name
+            )
+            return html_content
+        except FileNotFoundError:
+            logger.error(
+                "Template de confirmation introuvable: %s", template_path
+            )
+            return self._render_password_changed_fallback_html(display_name)
+        except Exception as e:
+            logger.error(
+                "Erreur lors du rendu du template de confirmation: %s", e
+            )
+            return self._render_password_changed_fallback_html(display_name)
+
+    def _render_password_changed_plain_text(
+        self,
+        user_name: Optional[str],
+    ) -> str:
+        """Render the confirmation plain-text body."""
+        display_name = user_name if user_name else "Utilisateur"
+
+        lines = [
+            COMPANY_NAME,
+            "=" * 50,
+            "",
+            f"Bonjour {display_name},",
+            "",
+            "Nous vous confirmons que le mot de passe de votre compte a",
+            "bien été réinitialisé.",
+            "",
+            "Vous pouvez maintenant vous connecter avec votre nouveau",
+            "mot de passe.",
+            "",
+            "⚠️  SI CE CHANGEMENT N'EST PAS DE VOTRE FAIT",
+            "Contactez immédiatement votre administrateur système. Votre",
+            "compte doit être sécurisé au plus vite.",
+            "",
+            "=" * 50,
+            f"Cet email a été envoyé automatiquement par {COMPANY_NAME}.",
+            "Merci de ne pas répondre à cet email.",
+            "",
+            f"© 2024 {COMPANY_NAME}. Tous droits réservés.",
+        ]
+        return "\n".join(lines)
+
+    def _render_password_changed_fallback_html(
+        self,
+        display_name: str,
+    ) -> str:
+        """Fallback HTML if the main template cannot be read."""
+        return f"""
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Mot de passe modifié - {COMPANY_NAME}</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #102624; background-color: #F5F7F7;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 24px; background:#ffffff; border-radius: 12px; border: 1px solid #D8DFDE;">
+        <h2 style="color: {COLOR_PRIMARY}; margin: 0 0 16px 0;">{COMPANY_NAME}</h2>
+        <p>Bonjour {display_name},</p>
+        <p>Votre mot de passe a bien été réinitialisé.</p>
+        <p>Si vous n'êtes pas à l'origine de cette modification, contactez immédiatement votre administrateur.</p>
+    </div>
+</body>
+</html>
+"""
+
     def _render_otp_template(self, otp: str, user_name: Optional[str]) -> str:
         """
         Génère le contenu HTML de l'email à partir du template

@@ -237,6 +237,23 @@ class PasswordResetService:
                 user.id
             )
 
+            # Notifier par email — best-effort. Le mot de passe est
+            # déjà persisté à ce stade; un échec d'envoi ne doit pas
+            # rollback la transaction.
+            user_name = f"{user.nom} {user.prenom}".strip() or None
+            try:
+                await self.email_service.send_password_changed_email(
+                    email=email,
+                    user_name=user_name,
+                )
+            except Exception:
+                logger.exception(
+                    "Envoi de l'email de confirmation de changement de "
+                    "mot de passe échoué pour %s (réinitialisation DB "
+                    "déjà effectuée, on continue)",
+                    email,
+                )
+
             return {"message": "Mot de passe réinitialisé avec succès"}
 
         except Exception as e:
