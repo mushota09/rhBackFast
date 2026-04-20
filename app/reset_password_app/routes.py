@@ -48,24 +48,27 @@ async def request_password_reset(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except RuntimeError:
+    except RuntimeError as e:
         logger.exception(
-            "Échec d'envoi d'email OTP pour %s (voir les logs du EmailService "
-            "pour la cause précise : SMTP auth, réseau, template...)",
+            "Échec d'envoi d'email OTP pour %s",
             request.email,
         )
+        # DEBUG: exception réelle exposée dans la réponse HTTP
+        # ⚠️ TODO revert avant prod (leak d'info interne)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erreur lors de l'envoi de l'email. Veuillez réessayer."
+            detail=f"[DEBUG] {type(e).__name__}: {e}",
         )
-    except Exception:
+    except Exception as e:
         logger.exception(
             "Erreur inattendue lors de la demande de réinitialisation pour %s",
             request.email,
         )
+        # DEBUG: exception réelle exposée dans la réponse HTTP
+        # ⚠️ TODO revert avant prod (leak d'info interne)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur technique est survenue. Veuillez réessayer."
+            detail=f"[DEBUG] {type(e).__name__}: {e}",
         )
 
 
@@ -102,14 +105,16 @@ async def verify_otp(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception:
+    except Exception as e:
         logger.exception(
             "Erreur inattendue lors de la vérification OTP pour %s",
             request.email,
         )
+        # DEBUG: exception réelle exposée dans la réponse HTTP
+        # ⚠️ TODO revert avant prod (leak d'info interne)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur technique est survenue. Veuillez réessayer."
+            detail=f"[DEBUG] {type(e).__name__}: {e}",
         )
 
 
@@ -161,24 +166,27 @@ async def resend_otp(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=error_message
             )
-    except RuntimeError:
+    except RuntimeError as e:
         logger.exception(
-            "Échec de renvoi d'email OTP pour %s (voir les logs du "
-            "EmailService pour la cause précise)",
+            "Échec de renvoi d'email OTP pour %s",
             request.email,
         )
+        # DEBUG: exception réelle exposée dans la réponse HTTP
+        # ⚠️ TODO revert avant prod (leak d'info interne)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erreur lors de l'envoi de l'email. Veuillez réessayer."
+            detail=f"[DEBUG] {type(e).__name__}: {e}",
         )
-    except Exception:
+    except Exception as e:
         logger.exception(
             "Erreur inattendue lors du renvoi OTP pour %s",
             request.email,
         )
+        # DEBUG: exception réelle exposée dans la réponse HTTP
+        # ⚠️ TODO revert avant prod (leak d'info interne)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur technique est survenue. Veuillez réessayer."
+            detail=f"[DEBUG] {type(e).__name__}: {e}",
         )
 
 
@@ -224,22 +232,26 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except RuntimeError:
+    except RuntimeError as e:
         logger.exception(
             "Erreur lors de la réinitialisation du mot de passe pour %s",
             request.email,
         )
+        # DEBUG: exception réelle exposée dans la réponse HTTP
+        # ⚠️ TODO revert avant prod (leak d'info interne)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur est survenue lors de la réinitialisation"
+            detail=f"[DEBUG] {type(e).__name__}: {e}",
         )
-    except Exception:
+    except Exception as e:
         logger.exception(
             "Erreur inattendue lors de la réinitialisation pour %s",
             request.email,
         )
+        # DEBUG: exception réelle exposée dans la réponse HTTP
+        # ⚠️ TODO revert avant prod (leak d'info interne)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur technique est survenue. Veuillez réessayer."
+            detail=f"[DEBUG] {type(e).__name__}: {e}",
         )
 
