@@ -2,7 +2,6 @@
 
 import smtplib
 import logging
-from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
@@ -13,11 +12,6 @@ from app.core.config import settings
 
 
 logger = logging.getLogger(__name__)
-
-
-def _format_now_fr() -> str:
-    """Return the current UTC timestamp in a French-friendly format."""
-    return datetime.utcnow().strftime("%d/%m/%Y à %H:%M UTC")
 
 
 class EmailService:
@@ -116,15 +110,12 @@ class EmailService:
         self,
         email: str,
         user_name: Optional[str] = None,
-        changed_at: Optional[str] = None,
     ) -> bool:
         """Send a confirmation email after a successful password reset.
 
         Args:
             email: Destination email address.
             user_name: Recipient display name (optional).
-            changed_at: Formatted timestamp to show in the recap card. If
-                ``None``, a French-formatted current UTC timestamp is used.
 
         Returns:
             ``True`` if the email was sent, ``False`` otherwise. Failures
@@ -141,12 +132,8 @@ class EmailService:
                 return False
 
             subject = "Votre mot de passe a été modifié"
-            html_content = self._render_password_changed_template(
-                email, user_name, changed_at
-            )
-            plain_content = self._render_password_changed_plain_text(
-                email, user_name, changed_at
-            )
+            html_content = self._render_password_changed_template(user_name)
+            plain_content = self._render_password_changed_plain_text(user_name)
 
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
@@ -195,9 +182,7 @@ class EmailService:
 
     def _render_password_changed_template(
         self,
-        email: str,
         user_name: Optional[str],
-        changed_at: Optional[str],
     ) -> str:
         """Render the confirmation HTML body."""
         template_path = (
@@ -206,7 +191,6 @@ class EmailService:
             / "password_changed_email.html"
         )
         display_name = user_name if user_name else "Utilisateur"
-        display_time = changed_at or _format_now_fr()
 
         try:
             with open(template_path, "r", encoding="utf-8") as f:
@@ -216,35 +200,24 @@ class EmailService:
             html_content = html_content.replace(
                 "{{ user_name }}", display_name
             )
-            html_content = html_content.replace("{{ user_email }}", email)
-            html_content = html_content.replace(
-                "{{ changed_at }}", display_time
-            )
             return html_content
         except FileNotFoundError:
             logger.error(
                 "Template de confirmation introuvable: %s", template_path
             )
-            return self._render_password_changed_fallback_html(
-                email, display_name, display_time
-            )
+            return self._render_password_changed_fallback_html(display_name)
         except Exception as e:
             logger.error(
                 "Erreur lors du rendu du template de confirmation: %s", e
             )
-            return self._render_password_changed_fallback_html(
-                email, display_name, display_time
-            )
+            return self._render_password_changed_fallback_html(display_name)
 
     def _render_password_changed_plain_text(
         self,
-        email: str,
         user_name: Optional[str],
-        changed_at: Optional[str],
     ) -> str:
         """Render the confirmation plain-text body."""
         display_name = user_name if user_name else "Utilisateur"
-        display_time = changed_at or _format_now_fr()
 
         lines = [
             COMPANY_NAME,
@@ -254,9 +227,6 @@ class EmailService:
             "",
             "Nous vous confirmons que le mot de passe de votre compte a",
             "bien été réinitialisé.",
-            "",
-            f"    Compte              : {email}",
-            f"    Date de modification : {display_time}",
             "",
             "Vous pouvez maintenant vous connecter avec votre nouveau",
             "mot de passe.",
@@ -275,9 +245,7 @@ class EmailService:
 
     def _render_password_changed_fallback_html(
         self,
-        email: str,
         display_name: str,
-        display_time: str,
     ) -> str:
         """Fallback HTML if the main template cannot be read."""
         return f"""
@@ -292,10 +260,6 @@ class EmailService:
         <h2 style="color: {COLOR_PRIMARY}; margin: 0 0 16px 0;">{COMPANY_NAME}</h2>
         <p>Bonjour {display_name},</p>
         <p>Votre mot de passe a bien été réinitialisé.</p>
-        <ul>
-            <li>Compte : <strong>{email}</strong></li>
-            <li>Date : <strong>{display_time}</strong></li>
-        </ul>
         <p>Si vous n'êtes pas à l'origine de cette modification, contactez immédiatement votre administrateur.</p>
     </div>
 </body>
