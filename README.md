@@ -42,8 +42,22 @@ rhBackFast/
 ├── alembic/               # Migrations de base de données
 ├── main.py                # Point d'entrée de l'application
 ├── pyproject.toml         # Dépendances du projet
-└── .env                   # Variables d'environnement
+└── .env                   # Variables d'environnement (non versionné — voir .env.example)
 ```
+
+## 🔐 Configuration des variables d'environnement
+
+Le fichier `.env` **n'est pas versionné** (il contient des secrets : `DATABASE_URL`, `SECRET_KEY`, `SMTP_PASSWORD`, etc.). Pour démarrer :
+
+```bash
+cp .env.example .env
+# Puis édite .env avec tes vraies valeurs :
+# - DATABASE_URL (Postgres local ou Neon)
+# - SECRET_KEY (génère avec: openssl rand -hex 32)
+# - SMTP_USER / SMTP_PASSWORD (Gmail App Password si 2FA active)
+```
+
+> ⚠️ Ne jamais committer `.env`. Le `.gitignore` bloque explicitement tous les `.env*` sauf `.env.example`.
 
 ## Modèles Implémentés
 
