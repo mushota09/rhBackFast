@@ -34,10 +34,11 @@ env/
 *~
 
 # Environment variables
-.env
-.env.local
-.env.*.local
-.env.*
+# .env is intentionally tracked in this repo (internal project, see PR #20)
+# .env
+# .env.local
+# .env.*.local
+# .env.*
 !.env.example
 
 # Database
