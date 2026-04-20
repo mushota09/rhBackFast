@@ -17,10 +17,18 @@ ssl_context.check_hostname = False
 ssl_context.verify_mode = ssl.CERT_NONE
 
 # Create async engine with SSL configuration
+#
+# pool_pre_ping tests each connection with a lightweight query before
+# checkout, transparently reconnecting if the remote end has closed the
+# socket (typical with Neon / managed Postgres idle timeouts).
+# pool_recycle proactively recycles connections older than the threshold
+# so we never rely on a TCP keepalive matching the provider's idle limit.
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
+    pool_pre_ping=True,
+    pool_recycle=300,
     connect_args={
         "ssl": ssl_context,
         "server_settings": {
