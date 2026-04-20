@@ -81,11 +81,29 @@ class EmailService:
             logger.info(f"Email OTP envoyé avec succès à {email}")
             return True
 
-        except smtplib.SMTPException as e:
-            logger.error(f"Erreur SMTP lors de l'envoi de l'email à {email}: {e}")
+        except smtplib.SMTPAuthenticationError as e:
+            logger.exception(
+                "Authentification SMTP refusée lors de l'envoi à %s "
+                "(code=%s). Vérifier SMTP_USER/SMTP_PASSWORD: pour Gmail, "
+                "il faut un App Password (2FA requise) et non le mot de "
+                "passe du compte. Message serveur: %r",
+                email,
+                getattr(e, "smtp_code", "?"),
+                getattr(e, "smtp_error", b""),
+            )
             return False
-        except Exception as e:
-            logger.error(f"Erreur lors de l'envoi de l'email à {email}: {e}")
+        except smtplib.SMTPException as e:
+            logger.exception(
+                "Erreur SMTP lors de l'envoi de l'email à %s: %s",
+                email,
+                e,
+            )
+            return False
+        except Exception:
+            logger.exception(
+                "Erreur inattendue lors de l'envoi de l'email à %s",
+                email,
+            )
             return False
 
     def _render_otp_template(self, otp: str, user_name: Optional[str]) -> str:

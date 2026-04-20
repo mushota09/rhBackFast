@@ -48,24 +48,24 @@ async def request_password_reset(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except RuntimeError as e:
-        logger.error(
-            "Erreur lors de l'envoi d'email pour %s: %s",
+    except RuntimeError:
+        logger.exception(
+            "Échec d'envoi d'email OTP pour %s (voir les logs du EmailService "
+            "pour la cause précise : SMTP auth, réseau, template...)",
             request.email,
-            str(e)
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erreur lors de l'envoi de l'email. Veuillez réessayer."
         )
-    except Exception as e:
-        logger.error(
-            "Erreur inattendue lors de la demande de réinitialisation: %s",
-            str(e)
+    except Exception:
+        logger.exception(
+            "Erreur inattendue lors de la demande de réinitialisation pour %s",
+            request.email,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur est survenue. Veuillez réessayer."
+            detail="Une erreur technique est survenue. Veuillez réessayer."
         )
 
 
@@ -102,14 +102,14 @@ async def verify_otp(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception as e:
-        logger.error(
-            "Erreur inattendue lors de la vérification OTP: %s",
-            str(e)
+    except Exception:
+        logger.exception(
+            "Erreur inattendue lors de la vérification OTP pour %s",
+            request.email,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur est survenue. Veuillez réessayer."
+            detail="Une erreur technique est survenue. Veuillez réessayer."
         )
 
 
@@ -161,24 +161,24 @@ async def resend_otp(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=error_message
             )
-    except RuntimeError as e:
-        logger.error(
-            "Erreur lors du renvoi d'email pour %s: %s",
+    except RuntimeError:
+        logger.exception(
+            "Échec de renvoi d'email OTP pour %s (voir les logs du "
+            "EmailService pour la cause précise)",
             request.email,
-            str(e)
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erreur lors de l'envoi de l'email. Veuillez réessayer."
         )
-    except Exception as e:
-        logger.error(
-            "Erreur inattendue lors du renvoi OTP: %s",
-            str(e)
+    except Exception:
+        logger.exception(
+            "Erreur inattendue lors du renvoi OTP pour %s",
+            request.email,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur est survenue. Veuillez réessayer."
+            detail="Une erreur technique est survenue. Veuillez réessayer."
         )
 
 
@@ -224,24 +224,22 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except RuntimeError as e:
-        logger.error(
-            "Erreur lors de la réinitialisation du mot de passe "
-            "pour %s: %s",
+    except RuntimeError:
+        logger.exception(
+            "Erreur lors de la réinitialisation du mot de passe pour %s",
             request.email,
-            str(e)
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Une erreur est survenue lors de la réinitialisation"
         )
-    except Exception as e:
-        logger.error(
-            "Erreur inattendue lors de la réinitialisation: %s",
-            str(e)
+    except Exception:
+        logger.exception(
+            "Erreur inattendue lors de la réinitialisation pour %s",
+            request.email,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Une erreur est survenue. Veuillez réessayer."
+            detail="Une erreur technique est survenue. Veuillez réessayer."
         )
 
