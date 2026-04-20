@@ -25,7 +25,11 @@ jobs:
           set -e
           export PATH="/home/rapha/.local/bin:$PATH"
           cd ${{ secrets.REMOTE_PATH_PROJECT }}
-          git pull origin master
+          # Deploy target: always align with origin/master, never keep
+          # local divergent commits. `git pull` can fail with "divergent
+          # branches" if past deploys created accidental merge commits.
+          git fetch origin master
+          git reset --hard origin/master
           uv sync
           echo "${{ secrets.PASSPHRASE }}" | sudo -S systemctl restart fastapi_uv
           sleep 3
