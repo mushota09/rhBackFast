@@ -19,6 +19,8 @@ from app.conge_app.constants import PERMISSIONS as CONGE_PERMISSIONS
 from app.conge_app.init_data import init_conge_defaults
 from app.paie_app.init_data import init_paie_workflow_defaults
 from app.paie_app.constants import WORKFLOW_PERMISSIONS as PAIE_WORKFLOW_PERMISSIONS
+from app.stock_app.constants import PERMISSIONS as STOCK_PERMISSIONS
+from app.stock_app.init_data import init_stock_defaults
 
 
 # Audit app permissions
@@ -243,6 +245,34 @@ async def create_default_permissions():
                 created_count += 1
                 audit_created += 1
 
+            # Create stock_app specific permissions
+            stock_created = 0
+            for codename, description in STOCK_PERMISSIONS.items():
+                result = await session.execute(
+                    select(Permission).where(Permission.codename == codename)
+                )
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    skipped_count += 1
+                    continue
+
+                parts = codename.split(".")
+                resource = parts[0]
+                action = parts[1].upper() if len(parts) > 1 else "CUSTOM"
+
+                permission = Permission(
+                    codename=codename,
+                    name=description,
+                    content_type=0,
+                    resource=resource,
+                    action=action,
+                    description=description,
+                )
+                session.add(permission)
+                created_count += 1
+                stock_created += 1
+
             # Create paie_app specific permissions
             paie_created = 0
             for codename, description in PAIE_PERMISSIONS.items():
@@ -285,6 +315,8 @@ async def create_default_permissions():
                 print(f"   - Audit app: {audit_created} permissions")
             if paie_created > 0:
                 print(f"   - Paie app: {paie_created} permissions")
+            if stock_created > 0:
+                print(f"   - Stock app: {stock_created} permissions")
         if skipped_count > 0:
             print(f"⏭️  Skipped {skipped_count} existing permissions")
 
@@ -355,6 +387,35 @@ async def init_paie_workflow_defaults_task():
         await engine.dispose()
 
 
+async def init_stock_defaults_task():
+    """Initialise les données par défaut du module stock.
+
+    Désactivable via ``STOCK_INIT_DEFAULTS=False``. Idempotent.
+    """
+    if not getattr(settings, "STOCK_INIT_DEFAULTS", True):
+        print("⏭️  Stock defaults init disabled")
+        return
+
+    print("\n📦 Initializing STOCK defaults...")
+
+    engine = create_async_engine(settings.DATABASE_URL, echo=False)
+    async_session = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    try:
+        async with async_session() as session:
+            await init_stock_defaults(session)
+            await session.commit()
+        print("✓ STOCK defaults initialization complete\n")
+    except Exception as e:
+        print(f"❌ Error initializing STOCK defaults: {e}\n")
+    finally:
+        await engine.dispose()
+
+
 async def run_startup_tasks():
     """
     Run all startup tasks.
@@ -363,6 +424,7 @@ async def run_startup_tasks():
     await create_default_permissions()
     await init_conge_workflow_defaults()
     await init_paie_workflow_defaults_task()
+    await init_stock_defaults_task()
     # Add other startup tasks here in the future
 
 

@@ -16,6 +16,7 @@ from app.audit_app.routes import router as audit_router
 from app.reset_password_app import router as password_reset_router
 from app.conge_app.routes import router as conge_router
 from app.presence_app.routes import router as presence_router
+from app.stock_app.routes import router as stock_router
 
 # Validate configuration at startup
 validate_configuration()
@@ -66,6 +67,7 @@ app.include_router(audit_router, prefix="/api")
 app.include_router(password_reset_router)
 app.include_router(conge_router)
 app.include_router(presence_router)
+app.include_router(stock_router)
 
 # Mount the uploads directory so saved files are served at /uploads/*
 uploads_dir = Path("uploads")
